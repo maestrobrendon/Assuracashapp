@@ -145,12 +145,10 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Added smooth font rendering */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Smooth transitions matching reference design */
   button,
   a,
   [role="button"] {
@@ -158,28 +156,29 @@
   }
 }
 
-/* Updated shadow system to match reference design - subtle, soft shadows */
-.card-shadow {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
-}
+/* Wrapped custom utilities in @layer utilities to fix Tailwind v4 error */
+@layer utilities {
+  .card-shadow {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
 
-.card-shadow-lg {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
-}
+  .card-shadow-lg {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
+  }
 
-/* Success color utility */
-.text-success {
-  color: hsl(var(--success));
-}
+  .text-success {
+    color: hsl(var(--success));
+  }
 
-.bg-success {
-  background-color: hsl(var(--success));
-}
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
 
-.text-warning {
-  color: hsl(var(--warning));
-}
+  .text-warning {
+    color: hsl(var(--warning));
+  }
 
-.bg-warning {
-  background-color: hsl(var(--warning));
+  .bg-warning {
+    background-color: hsl(var(--warning));
+  }
 }

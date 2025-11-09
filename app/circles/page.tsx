@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Users,
   Plus,
@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreateCircleModal } from "@/components/modals/create-circle-modal"
 import { ContributeCircleModal } from "@/components/modals/contribute-circle-modal"
 import Link from "next/link"
+import { getUserCircles, getPublicCircles } from "@/lib/actions/circles"
 
 export default function CirclesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -32,95 +33,35 @@ export default function CirclesPage() {
     circleName: "",
   })
   const [searchQuery, setSearchQuery] = useState("")
+  const [myCircles, setMyCircles] = useState<any[]>([])
+  const [publicCircles, setPublicCircles] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Mock user's circles
-  const myCircles = [
-    {
-      id: "c1",
-      name: "Family Vacation Fund",
-      description: "Saving together for December holiday in Dubai",
-      balance: 420000,
-      targetAmount: 1500000,
-      memberCount: 5,
-      role: "admin",
-      isPublic: false,
-      category: "Group Savings",
-      deadline: new Date("2025-12-01"),
-      recentActivity: [
-        { member: "Tunde", amount: 50000, time: "2 hours ago" },
-        { member: "You", amount: 100000, time: "1 day ago" },
-      ],
-    },
-    {
-      id: "c2",
-      name: "Flatmates Rent Fund",
-      description: "Monthly rent contribution for our 3-bedroom apartment",
-      balance: 850000,
-      targetAmount: 900000,
-      memberCount: 3,
-      role: "member",
-      isPublic: false,
-      category: "Rent Split",
-      recurringAmount: 300000,
-      recentActivity: [
-        { member: "Kemi", amount: 300000, time: "3 days ago" },
-        { member: "David", amount: 300000, time: "5 days ago" },
-      ],
-    },
-    {
-      id: "c3",
-      name: "Wedding Ajo - Feb 2025",
-      description: "Monthly savings group for Kemi's wedding",
-      balance: 1250000,
-      targetAmount: 2000000,
-      memberCount: 8,
-      role: "moderator",
-      isPublic: false,
-      category: "Ajo/Esusu",
-      recurringAmount: 50000,
-      recentActivity: [
-        { member: "Grace", amount: 50000, time: "1 day ago" },
-        { member: "Lawrence", amount: 50000, time: "2 days ago" },
-      ],
-    },
-  ]
+  useEffect(() => {
+    loadCircles()
+  }, [])
 
-  // Mock public circles for discovery
-  const publicCircles = [
-    {
-      id: "p1",
-      name: "Clean Water Campaign - Enugu",
-      description: "Help us build wells in rural communities",
-      balance: 2850000,
-      targetAmount: 5000000,
-      memberCount: 124,
-      category: "Charity/Fundraiser",
-      organizer: "Water For Life NGO",
-      isPublic: true,
-    },
-    {
-      id: "p2",
-      name: "Tech Conference 2025",
-      description: "Group funding for conference tickets and travel",
-      balance: 680000,
-      targetAmount: 1200000,
-      memberCount: 18,
-      category: "Event Planning",
-      organizer: "Lagos Tech Community",
-      isPublic: true,
-    },
-    {
-      id: "p3",
-      name: "Community Library Project",
-      description: "Building a free library for Ikeja community",
-      balance: 1450000,
-      targetAmount: 3000000,
-      memberCount: 89,
-      category: "Charity/Fundraiser",
-      organizer: "Ikeja Readers Club",
-      isPublic: true,
-    },
-  ]
+  const loadCircles = async () => {
+    setIsLoading(true)
+    const [userResult, publicResult] = await Promise.all([getUserCircles(), getPublicCircles()])
+
+    if (userResult.data) {
+      setMyCircles(userResult.data)
+    }
+
+    if (publicResult.data) {
+      setPublicCircles(publicResult.data)
+    }
+
+    setIsLoading(false)
+  }
+
+  const handleCreateModalClose = (open: boolean) => {
+    setCreateModalOpen(open)
+    if (!open) {
+      loadCircles()
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -419,7 +360,7 @@ export default function CirclesPage() {
       </main>
 
       {/* Modals */}
-      <CreateCircleModal open={createModalOpen} onOpenChange={setCreateModalOpen} />
+      <CreateCircleModal open={createModalOpen} onOpenChange={handleCreateModalClose} />
       <ContributeCircleModal
         open={contributeModal.open}
         onOpenChange={(open) => setContributeModal({ ...contributeModal, open })}

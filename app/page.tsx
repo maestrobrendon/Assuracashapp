@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   TrendingUp,
   Users,
@@ -34,7 +34,8 @@ import { WithdrawModal } from "@/components/modals/withdraw-modal"
 import { BudgetWalletModal } from "@/components/modals/budget-wallet-modal"
 import { GoalWalletModal } from "@/components/modals/goal-wallet-modal"
 import { WalletCard } from "@/components/wallet-card"
-import { mockWallets, mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mock-data"
+import { mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mock-data"
+import { getBudgetWallets, getGoalWallets } from "@/lib/actions/wallets"
 
 export default function HomePage() {
   const [sendModalOpen, setSendModalOpen] = useState(false)
@@ -49,6 +50,9 @@ export default function HomePage() {
   const [isQuickStatsOpen, setIsQuickStatsOpen] = useState(false)
   const [currentRequestIndex, setCurrentRequestIndex] = useState(0)
   const [balancesHidden, setBalancesHidden] = useState(false)
+  const [budgetWallets, setBudgetWallets] = useState<any[]>([])
+  const [goalWallets, setGoalWallets] = useState<any[]>([])
+  const [isLoadingWallets, setIsLoadingWallets] = useState(true)
 
   const totalBalance = 125450.45
   const recentTransactions = [
@@ -62,9 +66,6 @@ export default function HomePage() {
     { id: 1, name: "Team Fund", members: 5, balance: 234500 },
     { id: 2, name: "Project Alpha", members: 3, balance: 89200 },
   ]
-
-  const budgetWallets = mockWallets.filter((w) => w.type === "budget")
-  const goalWallets = mockWallets.filter((w) => w.type === "goal")
 
   const activePendingRequests = mockPendingRequests.filter((req) => !dismissedRequests.includes(req.id))
 
@@ -105,6 +106,59 @@ export default function HomePage() {
       setCurrentRequestIndex(Math.max(0, activePendingRequests.length - 2))
     }
   }
+
+  const handleBudgetModalClose = (open: boolean) => {
+    setBudgetModalOpen(open)
+    if (!open) {
+      loadWallets()
+    }
+  }
+
+  const handleGoalModalClose = (open: boolean) => {
+    setGoalModalOpen(open)
+    if (!open) {
+      loadWallets()
+    }
+  }
+
+  const loadWallets = async () => {
+    setIsLoadingWallets(true)
+    const [budgetResult, goalResult] = await Promise.all([getBudgetWallets(), getGoalWallets()])
+
+    if (budgetResult.data) {
+      setBudgetWallets(
+        budgetResult.data.map((w: any) => ({
+          id: w.id,
+          name: w.name,
+          type: "budget",
+          balance: w.balance,
+          spent: 0,
+          limit: w.spend_limit || w.balance,
+          color: "from-blue-500 to-cyan-500",
+        })),
+      )
+    }
+
+    if (goalResult.data) {
+      setGoalWallets(
+        goalResult.data.map((w: any) => ({
+          id: w.id,
+          name: w.name,
+          type: "goal",
+          balance: w.current_amount,
+          target: w.target_amount,
+          deadline: w.deadline,
+          color: "from-purple-500 to-pink-500",
+        })),
+      )
+    }
+
+    setIsLoadingWallets(false)
+  }
+
+  useEffect(() => {
+    loadWallets()
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
@@ -678,8 +732,8 @@ export default function HomePage() {
       <RequestMoneyModal open={requestModalOpen} onOpenChange={setRequestModalOpen} />
       <TopUpModal open={topUpModalOpen} onOpenChange={setTopUpModalOpen} />
       <WithdrawModal open={withdrawModalOpen} onOpenChange={setWithdrawModalOpen} currentBalance={totalBalance} />
-      <BudgetWalletModal open={budgetModalOpen} onOpenChange={setBudgetModalOpen} />
-      <GoalWalletModal open={goalModalOpen} onOpenChange={setGoalModalOpen} />
+      <BudgetWalletModal open={budgetModalOpen} onOpenChange={handleBudgetModalClose} />
+      <GoalWalletModal open={goalModalOpen} onOpenChange={handleGoalModalClose} />
     </div>
   )
 }

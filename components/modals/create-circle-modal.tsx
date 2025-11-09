@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, Globe, Lock } from "lucide-react"
 import { format } from "date-fns"
+import { createCircle } from "@/lib/actions/circles"
 
 interface CreateCircleModalProps {
   open: boolean
@@ -31,20 +32,41 @@ export function CreateCircleModal({ open, onOpenChange }: CreateCircleModalProps
   const [recurringEnabled, setRecurringEnabled] = useState(false)
   const [recurringAmount, setRecurringAmount] = useState("")
   const [recurringFrequency, setRecurringFrequency] = useState("monthly")
+  const [isCreating, setIsCreating] = useState(false)
 
-  const handleCreate = () => {
-    console.log("[v0] Creating circle:", {
-      circleName,
-      description,
-      category,
-      targetAmount,
-      deadline,
-      isPublic,
-      allowExternal,
-      privacySettings: { showMemberNames, showContributions },
-      recurring: recurringEnabled ? { amount: recurringAmount, frequency: recurringFrequency } : null,
-    })
-    onOpenChange(false)
+  const handleCreate = async () => {
+    setIsCreating(true)
+
+    try {
+      const result = await createCircle({
+        circleName,
+        description,
+        category,
+        targetAmount: targetAmount ? Number.parseFloat(targetAmount) : undefined,
+        deadline,
+        isPublic,
+        allowExternal,
+        showMemberNames,
+        showContributions,
+        recurringAmount: recurringEnabled && recurringAmount ? Number.parseFloat(recurringAmount) : undefined,
+        recurringFrequency: recurringEnabled ? recurringFrequency : undefined,
+      })
+
+      if (result.error) {
+        console.error("[v0] Error:", result.error)
+        alert("Failed to create circle: " + result.error)
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Circle created successfully:", result.data)
+      onOpenChange(false)
+    } catch (error) {
+      console.error("[v0] Unexpected error:", error)
+      alert("An unexpected error occurred")
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   return (
@@ -222,11 +244,16 @@ export function CreateCircleModal({ open, onOpenChange }: CreateCircleModalProps
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1 bg-transparent" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="outline"
+              className="flex-1 bg-transparent"
+              onClick={() => onOpenChange(false)}
+              disabled={isCreating}
+            >
               Cancel
             </Button>
-            <Button className="flex-1" onClick={handleCreate} disabled={!circleName}>
-              Create Circle
+            <Button className="flex-1" onClick={handleCreate} disabled={!circleName || isCreating}>
+              {isCreating ? "Creating..." : "Create Circle"}
             </Button>
           </div>
         </div>

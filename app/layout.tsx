@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 
-import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
 import { Manrope, Geist_Mono } from "next/font/google"
@@ -52,7 +51,6 @@ export default function RootLayout({
       <body className={`${manrope.variable} ${geistMono.variable} font-sans antialiased`}>
         <Sidebar />
         <div className="lg:pl-64 pt-14 lg:pt-0">{children}</div>
-        <Analytics />
       </body>
     </html>
   )

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { ChevronDown, ChevronUp, Check, Wallet, Target, Calendar, Upload, X } from "lucide-react"
+import { createBudgetWallet, createGoalWallet } from "@/lib/actions/wallets"
 
 interface BudgetWalletModalProps {
   open: boolean
@@ -41,9 +42,62 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
   const [flexContributions, setFlexContributions] = useState(false)
 
   const [step, setStep] = useState<"form" | "success">("form")
+  const [isCreating, setIsCreating] = useState(false)
 
-  const handleCreate = () => {
-    setStep("success")
+  const handleCreate = async () => {
+    setIsCreating(true)
+
+    try {
+      if (walletType === "budget") {
+        const result = await createBudgetWallet({
+          walletName,
+          budgetAmount: Number.parseFloat(budgetAmount),
+          spendLimit: spendLimit ? Number.parseFloat(spendLimit) : undefined,
+          lockWallet,
+          lockDuration: lockDuration ? Number.parseInt(lockDuration) : undefined,
+          disbursementFrequency,
+          dayOfWeek: disbursementFrequency === "monthly" ? undefined : dayOfWeek,
+          dayOfMonth: disbursementFrequency === "monthly" ? dayOfMonth : undefined,
+          enableRollover,
+          automaticAllocation,
+          allocationFrequency,
+          allocationDay: allocationFrequency === "monthly" ? undefined : allocationDay,
+          allocationDayOfMonth: allocationFrequency === "monthly" ? allocationDayOfMonth : undefined,
+          customNotifications,
+        })
+
+        if (result.error) {
+          console.error("[v0] Error:", result.error)
+          alert("Failed to create budget wallet: " + result.error)
+          setIsCreating(false)
+          return
+        }
+      } else {
+        const result = await createGoalWallet({
+          goalName: walletName,
+          targetAmount: Number.parseFloat(budgetAmount),
+          goalDeadline,
+          fundingSource,
+          goalImage,
+          smartReminders,
+          flexContributions,
+        })
+
+        if (result.error) {
+          console.error("[v0] Error:", result.error)
+          alert("Failed to create goal wallet: " + result.error)
+          setIsCreating(false)
+          return
+        }
+      }
+
+      setStep("success")
+    } catch (error) {
+      console.error("[v0] Unexpected error:", error)
+      alert("An unexpected error occurred")
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const handleClose = () => {
@@ -473,11 +527,15 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent">
+              <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent" disabled={isCreating}>
                 Cancel
               </Button>
-              <Button onClick={handleCreate} className="flex-1 bg-primary" disabled={!walletName || !budgetAmount}>
-                Create {walletType === "budget" ? "Budget" : "Goal"}
+              <Button
+                onClick={handleCreate}
+                className="flex-1 bg-primary"
+                disabled={!walletName || !budgetAmount || isCreating}
+              >
+                {isCreating ? "Creating..." : `Create ${walletType === "budget" ? "Budget" : "Goal"}`}
               </Button>
             </div>
           </>
