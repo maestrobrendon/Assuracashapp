@@ -4,68 +4,59 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Assura Cash brand colors from official guide */
-  /* Primary: Flutterwave Orange (#FE6037 / #FF5C00) */
-  --primary: 25 95% 60%; /* Orange HSL */
-  --primary-foreground: 0 0% 100%; /* White */
+  /* Updated to match reference design - clean light neutral palette */
+  --background: 210 20% 98%; /* #FAFBFC Very light gray background */
+  --foreground: 216 24% 16%; /* #2D3748 Dark charcoal */
 
-  /* Deep Navy Blue for text and trust elements */
-  --navy: 210 72% 14%; /* #0A2540 */
-
-  /* Vibrant Purple for accents */
-  --purple: 267 100% 62%; /* #8B3FFF */
-
-  /* Electric Green for success states */
-  --success: 158 100% 45%; /* #00E396 */
-  --success-foreground: 0 0% 100%;
-
-  /* Secondary colors */
-  --coral: 0 100% 71%; /* #FF6B6B */
-  --golden: 51 100% 50%; /* #FFD700 */
-  --sky-blue: 176 62% 55%; /* #4ECDC4 */
-
-  /* Neutrals from brand guide */
-  --background: 210 20% 98%; /* #F7FAFC Light Gray */
-  --foreground: 216 24% 16%; /* #2D3748 Charcoal Gray */
-
-  --card: 0 0% 100%; /* Pure White */
+  --card: 0 0% 100%; /* Pure white cards */
   --card-foreground: 216 24% 16%;
 
   --popover: 0 0% 100%;
   --popover-foreground: 216 24% 16%;
 
-  /* Secondary uses charcoal with lighter bg */
-  --secondary: 210 20% 96%;
+  /* Primary color - keeping Assura orange but can adjust */
+  --primary: 25 95% 60%; /* Orange */
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary - light gray for subtle elements */
+  --secondary: 210 20% 96%; /* Very light gray */
   --secondary-foreground: 216 24% 16%;
 
-  --muted: 210 20% 96%;
-  --muted-foreground: 215 14% 50%;
+  --muted: 210 20% 96%; /* Light neutral gray */
+  --muted-foreground: 215 16% 47%; /* Medium gray text */
 
-  /* Accent uses orange */
-  --accent: 25 95% 60%;
+  --accent: 25 95% 60%; /* Orange accent */
   --accent-foreground: 0 0% 100%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 214 32% 91%;
+  /* Subtle borders like reference design */
+  --border: 214 32% 91%; /* Very light border */
   --input: 214 32% 91%;
-  --ring: 25 95% 60%; /* Orange ring */
+  --ring: 25 95% 60%;
 
-  /* Chart colors from brand palette */
-  --chart-1: 25 95% 60%; /* Orange */
-  --chart-2: 158 100% 45%; /* Green */
-  --chart-3: 267 100% 62%; /* Purple */
-  --chart-4: 176 62% 55%; /* Sky Blue */
-  --chart-5: 0 100% 71%; /* Coral */
+  /* Success and other utility colors */
+  --success: 158 100% 45%;
+  --success-foreground: 0 0% 100%;
 
-  /* Updated radius for modern fintech feel - 12-16px on cards, 8px on buttons */
-  --radius: 0.75rem; /* 12px base */
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
 
-  /* Sidebar uses white with subtle borders */
-  --sidebar: 0 0% 100%;
+  /* Chart colors */
+  --chart-1: 25 95% 60%;
+  --chart-2: 158 100% 45%;
+  --chart-3: 267 100% 62%;
+  --chart-4: 176 62% 55%;
+  --chart-5: 0 100% 71%;
+
+  /* Increased radius for modern look matching reference */
+  --radius: 0.75rem; /* 12px - consistent with reference design */
+
+  /* Sidebar colors */
+  --sidebar: 0 0% 100%; /* White sidebar */
   --sidebar-foreground: 216 24% 16%;
-  --sidebar-primary: 25 95% 60%; /* Orange for active state */
+  --sidebar-primary: 25 95% 60%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 210 20% 98%;
   --sidebar-accent-foreground: 216 24% 16%;
@@ -104,7 +95,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Manrope', 'Manrope Fallback';
+  --font-sans: "Manrope", "Manrope Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback", monospace;
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -132,6 +123,8 @@
   --color-chart-5: hsl(var(--chart-5));
   --color-success: hsl(var(--success));
   --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -152,9 +145,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Added smooth font rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Add smooth transitions for modern feel */
+  /* Smooth transitions matching reference design */
   button,
   a,
   [role="button"] {
@@ -162,20 +158,28 @@
   }
 }
 
-/* Custom utility for card shadows - 2-4px elevation */
+/* Updated shadow system to match reference design - subtle, soft shadows */
 .card-shadow {
-  box-shadow: 0 2px 8px rgba(10, 37, 64, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .card-shadow-lg {
-  box-shadow: 0 4px 16px rgba(10, 37, 64, 0.12);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
-/* Add success color utility */
+/* Success color utility */
 .text-success {
   color: hsl(var(--success));
 }
 
 .bg-success {
   background-color: hsl(var(--success));
+}
+
+.text-warning {
+  color: hsl(var(--warning));
+}
+
+.bg-warning {
+  background-color: hsl(var(--warning));
 }

@@ -3,7 +3,7 @@
 export type WalletType = "main" | "budget" | "goal"
 export type LockStatus = "locked" | "unlocked"
 export type TransactionType = "credit" | "debit" | "transfer"
-export type CircleRole = "admin" | "contributor" | "viewer"
+export type CircleRole = "admin" | "moderator" | "member"
 
 export interface Wallet {
   id: string
@@ -36,23 +36,83 @@ export interface Circle {
   id: string
   name: string
   description: string
+  purpose: string
   balance: number
   targetAmount?: number
+  deadline?: Date
   memberCount: number
+  members?: CircleMember[]
   adminId: string
   isPublic: boolean
   createdAt: Date
-  purpose: string
+  category?: string
+  allowExternalContributions?: boolean
+  externalLinkId?: string
+  privacySettings?: {
+    showMemberNames: boolean
+    showIndividualContributions: boolean
+  }
+  recurringContribution?: {
+    amount: number
+    frequency: "daily" | "weekly" | "monthly"
+  }
 }
 
 export interface CircleMember {
   id: string
-  circleId: string
+  circleId?: string
   userId: string
-  userName: string
+  userName?: string
+  name: string
+  username: string
+  avatar?: string
   role: CircleRole
   totalContributed: number
   joinedAt: Date
+}
+
+export interface CircleTransaction {
+  id: string
+  circleId: string
+  type: "contribution" | "withdrawal" | "external"
+  amount: number
+  from?: string
+  fromName?: string
+  to?: string
+  toName?: string
+  note?: string
+  timestamp: Date
+  receiptUrl?: string
+}
+
+export interface CirclePost {
+  id: string
+  circleId: string
+  authorId: string
+  authorName: string
+  authorRole: CircleRole
+  content: string
+  imageUrl?: string
+  timestamp: Date
+  reactions: { emoji: string; count: number; users: string[] }[]
+}
+
+export interface FavoriteContact {
+  id: string
+  name: string
+  username: string
+  initials: string
+  avatar: string | null
+}
+
+export interface PendingRequest {
+  id: string
+  from: string
+  username: string
+  amount: number
+  reason: string
+  expiresAt: Date
+  avatar: string
 }
 
 export interface User {
