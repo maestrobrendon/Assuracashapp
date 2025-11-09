@@ -1,5 +1,5 @@
 // Mock data for development
-import type { Wallet, Transaction, Circle, User } from "./types"
+import type { Wallet, Transaction, Circle, User, FavoriteContact, PendingRequest } from "./types"
 
 export const mockUser: User = {
   id: "user-1",
@@ -9,6 +9,35 @@ export const mockUser: User = {
   username: "@adebayo",
   avatar: "/placeholder-user.jpg",
 }
+
+export const mockFavoriteContacts: FavoriteContact[] = [
+  { id: "c1", name: "Grace Idowu", username: "@gracei", initials: "GI", avatar: null },
+  { id: "c2", name: "Lawrence Chukwu", username: "@lawrencec", initials: "LC", avatar: null },
+  { id: "c3", name: "Tunde Ogunleye", username: "@tundeo", initials: "TO", avatar: null },
+  { id: "c4", name: "Maria Sule", username: "@marias", initials: "MS", avatar: null },
+  { id: "c5", name: "Ken James", username: "@kenj", initials: "KJ", avatar: null },
+]
+
+export const mockPendingRequests: PendingRequest[] = [
+  {
+    id: "req1",
+    from: "Liz Dizon",
+    username: "@lizdizon",
+    amount: 37240,
+    reason: "Sunday Brunch",
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+    avatar: "L",
+  },
+  {
+    id: "req2",
+    from: "Chidi Okoro",
+    username: "@chidi",
+    amount: 15000,
+    reason: "Uber fare split",
+    expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
+    avatar: "C",
+  },
+]
 
 export const mockWallets: Wallet[] = [
   {

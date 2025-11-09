@@ -12,27 +12,43 @@ import {
   Download,
   Target,
   PiggyBank,
+  ArrowDownLeft,
+  UserPlus,
+  X,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { SendMoneyModal } from "@/components/modals/send-money-modal"
+import { RequestMoneyModal } from "@/components/request-money-modal"
 import { TopUpModal } from "@/components/modals/top-up-modal"
 import { WithdrawModal } from "@/components/modals/withdraw-modal"
 import { BudgetWalletModal } from "@/components/modals/budget-wallet-modal"
 import { GoalWalletModal } from "@/components/modals/goal-wallet-modal"
 import { WalletCard } from "@/components/wallet-card"
-import { mockWallets, mockCircles } from "@/lib/mock-data"
+import { mockWallets, mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mock-data"
 
 export default function HomePage() {
   const [sendModalOpen, setSendModalOpen] = useState(false)
+  const [requestModalOpen, setRequestModalOpen] = useState(false)
   const [topUpModalOpen, setTopUpModalOpen] = useState(false)
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
   const [goalModalOpen, setGoalModalOpen] = useState(false)
   const [walletType, setWalletType] = useState<"budget" | "goal">("budget")
   const [activeWalletTab, setActiveWalletTab] = useState<"budget" | "goals" | "circles">("budget")
+  const [dismissedRequests, setDismissedRequests] = useState<string[]>([])
+  const [isQuickStatsOpen, setIsQuickStatsOpen] = useState(false)
+  const [currentRequestIndex, setCurrentRequestIndex] = useState(0)
+  const [balancesHidden, setBalancesHidden] = useState(false)
 
   const totalBalance = 125450.45
   const recentTransactions = [
@@ -50,48 +66,123 @@ export default function HomePage() {
   const budgetWallets = mockWallets.filter((w) => w.type === "budget")
   const goalWallets = mockWallets.filter((w) => w.type === "goal")
 
+  const activePendingRequests = mockPendingRequests.filter((req) => !dismissedRequests.includes(req.id))
+
+  const formatBalance = (amount: number) => {
+    if (balancesHidden) {
+      return "₦••••••"
+    }
+    return `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+  }
+
+  const formatBalanceShort = (amount: number) => {
+    if (balancesHidden) {
+      return "₦••••••"
+    }
+    return `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 0 })}`
+  }
+
+  const getTimeUntilExpiry = (expiresAt: Date) => {
+    const now = new Date()
+    const diff = expiresAt.getTime() - now.getTime()
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    if (hours < 24) return `Expires in ${hours}h`
+    const days = Math.ceil(hours / 24)
+    return `Expires in ${days} day${days > 1 ? "s" : ""}`
+  }
+
+  const handlePrevRequest = () => {
+    setCurrentRequestIndex((prev) => (prev > 0 ? prev - 1 : activePendingRequests.length - 1))
+  }
+
+  const handleNextRequest = () => {
+    setCurrentRequestIndex((prev) => (prev < activePendingRequests.length - 1 ? prev + 1 : 0))
+  }
+
+  const handleDismissRequest = (requestId: string) => {
+    setDismissedRequests([...dismissedRequests, requestId])
+    if (currentRequestIndex >= activePendingRequests.length - 1) {
+      setCurrentRequestIndex(Math.max(0, activePendingRequests.length - 2))
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Balance Overview */}
         <div className="mb-8">
           <h2 className="mb-4 text-3xl font-bold text-foreground">Dashboard</h2>
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="col-span-2 shadow-sm">
+          <div className="grid gap-6">
+            <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Balance</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Balance</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setBalancesHidden(!balancesHidden)}
+                    className="h-8 w-8 rounded-full hover:bg-muted"
+                    aria-label={balancesHidden ? "Show balances" : "Hide balances"}
+                  >
+                    {balancesHidden ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-foreground">
-                    ₦{totalBalance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                  </span>
+                  <span className="text-4xl font-bold text-foreground">{formatBalance(totalBalance)}</span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-sm text-success">
                   <TrendingUp className="h-4 w-4" />
                   <span>+8.2% this month</span>
                 </div>
 
-                <div className="mt-6 grid grid-cols-4 gap-3">
+                <div className="mt-6 grid grid-cols-2 gap-3">
                   <Button
                     onClick={() => setSendModalOpen(true)}
-                    className="flex h-auto flex-col items-center gap-2 rounded-2xl py-4"
+                    size="lg"
+                    className="h-14 rounded-2xl text-base font-semibold"
                   >
-                    <div className="rounded-full bg-white/20 p-3">
-                      <Send className="h-5 w-5" />
+                    <Send className="mr-2 h-5 w-5" />
+                    Send
+                  </Button>
+
+                  <Button
+                    onClick={() => setRequestModalOpen(true)}
+                    variant="outline"
+                    size="lg"
+                    className="h-14 rounded-2xl bg-card text-base font-semibold"
+                  >
+                    <ArrowDownLeft className="mr-2 h-5 w-5" />
+                    Request
+                  </Button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-4 gap-3">
+                  <Button
+                    onClick={() => setSendModalOpen(true)}
+                    variant="ghost"
+                    className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
+                  >
+                    <div className="rounded-full bg-primary/10 p-2.5">
+                      <Send className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-xs">Send To</span>
+                    <span className="text-xs text-muted-foreground">Transfer</span>
                   </Button>
 
                   <Button
                     onClick={() => setTopUpModalOpen(true)}
-                    variant="outline"
-                    className="flex h-auto flex-col items-center gap-2 rounded-2xl bg-transparent py-4"
+                    variant="ghost"
+                    className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
                   >
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <Download className="h-5 w-5 text-primary" />
+                    <div className="rounded-full bg-primary/10 p-2.5">
+                      <Download className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-xs">Top Up</span>
+                    <span className="text-xs text-muted-foreground">Top Up</span>
                   </Button>
 
                   <Button
@@ -99,24 +190,24 @@ export default function HomePage() {
                       setWalletType("budget")
                       setBudgetModalOpen(true)
                     }}
-                    variant="outline"
-                    className="flex h-auto flex-col items-center gap-2 rounded-2xl bg-transparent py-4"
+                    variant="ghost"
+                    className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
                   >
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <Target className="h-5 w-5 text-primary" />
+                    <div className="rounded-full bg-primary/10 p-2.5">
+                      <Target className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-xs">Budget</span>
+                    <span className="text-xs text-muted-foreground">Budget</span>
                   </Button>
 
                   <Button
                     onClick={() => setWithdrawModalOpen(true)}
-                    variant="outline"
-                    className="flex h-auto flex-col items-center gap-2 rounded-2xl bg-transparent py-4"
+                    variant="ghost"
+                    className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
                   >
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <ArrowUpRight className="h-5 w-5 text-primary" />
+                    <div className="rounded-full bg-primary/10 p-2.5">
+                      <ArrowUpRight className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-xs">Withdraw</span>
+                    <span className="text-xs text-muted-foreground">Withdraw</span>
                   </Button>
                 </div>
               </CardContent>
@@ -124,31 +215,187 @@ export default function HomePage() {
 
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-muted-foreground">Quick Stats</CardTitle>
+                <button
+                  onClick={() => setIsQuickStatsOpen(!isQuickStatsOpen)}
+                  className="flex w-full items-center justify-between md:cursor-default"
+                >
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Quick Stats</CardTitle>
+                  {/* Show chevron only on mobile */}
+                  <div className="md:hidden">
+                    {isQuickStatsOpen ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </button>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Budget Wallets</span>
-                    <Zap className="h-4 w-4 text-primary" />
+              <CardContent className={`${isQuickStatsOpen ? "block" : "hidden md:block"}`}>
+                <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Budget Wallets</span>
+                      <Zap className="h-4 w-4 text-primary" />
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(totalBalance * 0.4)}</p>
                   </div>
-                  <p className="text-2xl font-bold text-foreground">
-                    ₦{(totalBalance * 0.4).toLocaleString("en-NG", { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Goal Wallets</span>
-                    <PiggyBank className="h-4 w-4 text-accent" />
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Goal Wallets</span>
+                      <PiggyBank className="h-4 w-4 text-accent" />
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(totalBalance * 0.3)}</p>
                   </div>
-                  <p className="text-2xl font-bold text-foreground">
-                    ₦{(totalBalance * 0.3).toLocaleString("en-NG", { minimumFractionDigits: 0 })}
-                  </p>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Circles</span>
+                      <Users className="h-4 w-4 text-primary" />
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(totalBalance * 0.2)}</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">This Month</span>
+                      <TrendingUp className="h-4 w-4 text-success" />
+                    </div>
+                    <p className="text-2xl font-bold text-success">+8.2%</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
+
+        {activePendingRequests.length > 0 && (
+          <div className="mb-6 relative">
+            {/* Count badge in top right */}
+            <div className="absolute -top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white text-sm font-bold shadow-lg">
+              {activePendingRequests.length}
+            </div>
+
+            {/* Slider container */}
+            <div className="relative overflow-hidden rounded-xl">
+              <div
+                className="flex transition-transform duration-300 ease-in-out"
+                style={{ transform: `translateX(-${currentRequestIndex * 100}%)` }}
+              >
+                {activePendingRequests.map((request) => (
+                  <div key={request.id} className="w-full flex-shrink-0">
+                    <Card className="relative overflow-hidden shadow-sm border-l-4 border-l-primary">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-2 h-8 w-8 rounded-full z-10"
+                        onClick={() => handleDismissRequest(request.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-lg">
+                              {request.avatar}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-foreground">{request.from}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Requested ₦{request.amount.toLocaleString("en-NG")}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{request.reason}</p>
+                              <div className="mt-1 flex items-center gap-1 text-xs text-warning">
+                                <Clock className="h-3 w-3" />
+                                {getTimeUntilExpiry(request.expiresAt)}
+                              </div>
+                            </div>
+                          </div>
+                          <Button onClick={() => setSendModalOpen(true)} className="rounded-xl">
+                            Send Money
+                            <ArrowUpRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
+
+              {/* Navigation buttons - show only if more than 1 request */}
+              {activePendingRequests.length > 1 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background shadow-md"
+                    onClick={handlePrevRequest}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background shadow-md"
+                    onClick={handleNextRequest}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Dot indicators */}
+            {activePendingRequests.length > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-3">
+                {activePendingRequests.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentRequestIndex(index)}
+                    className={`h-2 rounded-full transition-all ${
+                      index === currentRequestIndex ? "w-6 bg-primary" : "w-2 bg-muted-foreground/30"
+                    }`}
+                    aria-label={`Go to request ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <Card className="mb-8 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Your favorite people</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4 overflow-x-auto pb-2">
+              <button className="flex flex-col items-center gap-2 flex-shrink-0">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-border bg-muted/50 transition-colors hover:bg-muted">
+                  <UserPlus className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <span className="text-xs text-muted-foreground">Add</span>
+              </button>
+
+              {mockFavoriteContacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  className="flex flex-col items-center gap-2 flex-shrink-0 group"
+                  onClick={() => {
+                    // Pre-select this user and open send modal
+                    setSendModalOpen(true)
+                  }}
+                >
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 font-bold text-white text-sm transition-transform group-hover:scale-110">
+                    {contact.initials}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-foreground max-w-[60px] truncate">
+                      {contact.name.split(" ")[0]}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{contact.initials}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="mb-8">
           <Card className="shadow-sm">
@@ -273,9 +520,7 @@ export default function HomePage() {
                           </Badge>
                         </div>
 
-                        <p className="mb-4 text-3xl font-bold text-foreground">
-                          ₦{circle.balance.toLocaleString("en-NG")}
-                        </p>
+                        <p className="mb-4 text-3xl font-bold text-foreground">{formatBalanceShort(circle.balance)}</p>
 
                         {circle.targetAmount && (
                           <>
@@ -288,8 +533,8 @@ export default function HomePage() {
                               </div>
                             </div>
                             <div className="flex items-center justify-between text-sm text-muted-foreground">
-                              <span>₦{circle.balance.toLocaleString("en-NG")}</span>
-                              <span>₦{circle.targetAmount.toLocaleString("en-NG")}</span>
+                              <span>{formatBalanceShort(circle.balance)}</span>
+                              <span>{formatBalanceShort(circle.targetAmount)}</span>
                             </div>
                           </>
                         )}
@@ -334,7 +579,7 @@ export default function HomePage() {
                           />
                         ) : (
                           <ArrowUpRight
-                            className={`h-4 w-4 ${tx.type === "received" ? "text-success" : "text-accent"}`}
+                            className={`h-4 w-4 ${tx.type === "received" ? "text-success" : "text-foreground"}`}
                           />
                         )}
                       </div>
@@ -355,7 +600,9 @@ export default function HomePage() {
                     </div>
                     <div className="text-right">
                       <p className={`font-semibold ${tx.type === "received" ? "text-success" : "text-foreground"}`}>
-                        {tx.type === "received" ? "+" : "-"}₦{tx.amount.toLocaleString("en-NG")}
+                        {balancesHidden
+                          ? "₦••••"
+                          : `${tx.type === "received" ? "+" : "-"}₦${tx.amount.toLocaleString("en-NG")}`}
                       </p>
                       <p className="text-sm text-muted-foreground">{tx.date}</p>
                     </div>
@@ -392,7 +639,7 @@ export default function HomePage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-foreground">₦{circle.balance.toLocaleString("en-NG")}</p>
+                      <p className="font-semibold text-foreground">{formatBalanceShort(circle.balance)}</p>
                       <Link href={`/circles/${circle.id}`}>
                         <Button variant="link" size="sm" className="h-auto p-0 text-xs">
                           Manage
@@ -428,6 +675,7 @@ export default function HomePage() {
       </main>
 
       <SendMoneyModal open={sendModalOpen} onOpenChange={setSendModalOpen} currentBalance={totalBalance} />
+      <RequestMoneyModal open={requestModalOpen} onOpenChange={setRequestModalOpen} />
       <TopUpModal open={topUpModalOpen} onOpenChange={setTopUpModalOpen} />
       <WithdrawModal open={withdrawModalOpen} onOpenChange={setWithdrawModalOpen} currentBalance={totalBalance} />
       <BudgetWalletModal open={budgetModalOpen} onOpenChange={setBudgetModalOpen} />
