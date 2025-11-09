@@ -1,11 +1,13 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import { ChevronDown, ChevronUp, Check, Calendar, Upload } from "lucide-react"
 
 interface GoalWalletModalProps {
@@ -17,12 +19,17 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
   const [goalName, setGoalName] = useState("")
   const [targetAmount, setTargetAmount] = useState("")
   const [deadline, setDeadline] = useState("")
-  const [lockOption, setLockOption] = useState("lock")
-  const [fundingSource, setFundingSource] = useState("manual")
+  const [fundingSource, setFundingSource] = useState<"manual" | "auto">("manual")
+  const [goalImage, setGoalImage] = useState<File | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
+
+  const [smartReminders, setSmartReminders] = useState(false)
+  const [flexContributions, setFlexContributions] = useState(false)
+
   const [step, setStep] = useState<"form" | "success">("form")
 
   const handleCreate = () => {
+    // TODO: Implement goal wallet creation logic
     setStep("success")
   }
 
@@ -30,59 +37,80 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
     setGoalName("")
     setTargetAmount("")
     setDeadline("")
-    setLockOption("lock")
     setFundingSource("manual")
+    setGoalImage(null)
     setShowAdvanced(false)
+    setSmartReminders(false)
+    setFlexContributions(false)
     setStep("form")
     onOpenChange(false)
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setGoalImage(e.target.files[0])
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-background">
         {step === "form" && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">Create Goal Wallet</DialogTitle>
-              <p className="text-sm text-muted-foreground">Save for defined goals with flexible timelines</p>
+              <DialogTitle className="text-xl font-bold">Create New Wallet</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            <div className="space-y-6 py-4">
               <div className="space-y-2">
-                <Label htmlFor="goalName">Goal Name</Label>
+                <Label htmlFor="goalName" className="text-sm font-medium">
+                  Goal Name
+                </Label>
                 <Input
                   id="goalName"
-                  placeholder="e.g., New iPhone, Vacation"
+                  placeholder="e.g., New Phone, Vacation"
                   value={goalName}
                   onChange={(e) => setGoalName(e.target.value)}
+                  className="bg-background"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="targetAmount">Target Amount</Label>
+                <Label htmlFor="targetAmount" className="text-sm font-medium">
+                  Target Amount
+                </Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                   <Input
                     id="targetAmount"
                     type="number"
-                    placeholder="200"
+                    placeholder="1200"
                     value={targetAmount}
                     onChange={(e) => setTargetAmount(e.target.value)}
-                    className="pl-8"
+                    className="pl-8 bg-background"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="deadline">Deadline / Goal Date</Label>
+                <Label htmlFor="deadline" className="text-sm font-medium">
+                  Deadline / Goal Date
+                </Label>
                 <div className="relative">
-                  <Input id="deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                  <Input
+                    id="deadline"
+                    type="date"
+                    placeholder="Pick a date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    className="bg-background"
+                  />
                   <Calendar className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Funding Source</Label>
+                <Label className="text-sm font-medium">Funding Source</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
@@ -104,22 +132,29 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Wallet Lock</Label>
-                <p className="text-xs text-muted-foreground">Control access to the funds in this wallet.</p>
-                <RadioGroup value={lockOption} onValueChange={setLockOption} className="space-y-2">
-                  <div className="flex items-start space-x-2 rounded-lg border border-border p-3">
-                    <RadioGroupItem value="lock" id="lock" className="mt-0.5" />
-                    <label htmlFor="lock" className="flex-1 text-sm leading-tight cursor-pointer">
-                      Lock until goal is reached or deadline passes
-                    </label>
-                  </div>
-                  <div className="flex items-start space-x-2 rounded-lg border border-border p-3">
-                    <RadioGroupItem value="open" id="open" className="mt-0.5" />
-                    <label htmlFor="open" className="flex-1 text-sm leading-tight cursor-pointer">
-                      Keep wallet open for withdrawals
-                    </label>
-                  </div>
-                </RadioGroup>
+                <Label htmlFor="goalImage" className="text-sm font-medium">
+                  Goal Image (Optional)
+                </Label>
+                <p className="text-xs text-muted-foreground">Add an image for goal visualization.</p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 justify-start bg-background"
+                    type="button"
+                    onClick={() => document.getElementById("goalImageInput")?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Choose file
+                  </Button>
+                  <span className="text-sm text-muted-foreground">{goalImage ? goalImage.name : "No file chosen"}</span>
+                  <input
+                    id="goalImageInput"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               <button
@@ -132,13 +167,26 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
 
               {showAdvanced && (
                 <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="goalImage">Goal Image (Optional)</Label>
-                    <p className="text-xs text-muted-foreground">Add an image for goal visualization.</p>
-                    <Button variant="outline" className="w-full justify-start bg-transparent" type="button">
-                      <Upload className="mr-2 h-4 w-4" />
-                      Choose file
-                    </Button>
+                  {/* Smart Reminders */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="smartReminders" className="text-sm font-medium cursor-pointer">
+                        Smart Reminders
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">Get intelligent reminders to fund your goal.</p>
+                    </div>
+                    <Switch id="smartReminders" checked={smartReminders} onCheckedChange={setSmartReminders} />
+                  </div>
+
+                  {/* Flex Contributions */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="flexContributions" className="text-sm font-medium cursor-pointer">
+                        Flex Contributions
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">Auto-adjust contributions if you miss one.</p>
+                    </div>
+                    <Switch id="flexContributions" checked={flexContributions} onCheckedChange={setFlexContributions} />
                   </div>
                 </div>
               )}
@@ -148,7 +196,11 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
               <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent">
                 Cancel
               </Button>
-              <Button onClick={handleCreate} className="flex-1" disabled={!goalName || !targetAmount}>
+              <Button
+                onClick={handleCreate}
+                className="flex-1 bg-primary hover:bg-primary/90"
+                disabled={!goalName || !targetAmount || !deadline}
+              >
                 Create Goal
               </Button>
             </div>
