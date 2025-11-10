@@ -30,13 +30,12 @@ export async function createCircle(data: {
       description: data.description,
       category: data.category,
       target_amount: data.targetAmount,
-      deadline: data.deadline?.toISOString(),
-      is_public: data.isPublic,
+      visibility: data.isPublic ? "public" : "private",
       allow_external_contributions: data.allowExternal,
-      show_member_names: data.showMemberNames,
-      show_individual_contributions: data.showContributions,
-      suggested_recurring_amount: data.recurringAmount,
-      recurring_frequency: data.recurringFrequency,
+      created_by: user.id,
+      purpose: data.description || "",
+      current_balance: 0,
+      member_count: 1,
     })
     .select()
     .single()
@@ -96,7 +95,7 @@ export async function getPublicCircles() {
   const { data, error } = await supabase
     .from("circles")
     .select("*")
-    .eq("is_public", true)
+    .eq("visibility", "public")
     .order("created_at", { ascending: false })
     .limit(20)
 

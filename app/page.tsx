@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 import {
   TrendingUp,
   Users,
@@ -38,6 +40,8 @@ import { mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mo
 import { getBudgetWallets, getGoalWallets } from "@/lib/actions/wallets"
 
 export default function HomePage() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
   const [sendModalOpen, setSendModalOpen] = useState(false)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
   const [topUpModalOpen, setTopUpModalOpen] = useState(false)
@@ -156,9 +160,38 @@ export default function HomePage() {
     setIsLoadingWallets(false)
   }
 
+  const checkAuth = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      router.push("/auth/login")
+    } else {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    loadWallets()
+    checkAuth()
   }, [])
+
+  useEffect(() => {
+    if (!isLoading) {
+      loadWallets()
+    }
+  }, [isLoading])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">

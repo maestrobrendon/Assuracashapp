@@ -14,10 +14,11 @@ import {
   ChevronDown,
 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -33,6 +34,7 @@ const bottomNavigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
@@ -41,6 +43,17 @@ export function Sidebar() {
       return pathname === path
     }
     return pathname.startsWith(path)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      setIsUserMenuOpen(false)
+      setIsMobileMenuOpen(false)
+      router.push("/auth/login")
+    } catch (error) {
+      console.error("Error logging out:", error)
+    }
   }
 
   return (
@@ -158,10 +171,7 @@ export function Sidebar() {
             {isUserMenuOpen && (
               <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-border bg-card shadow-lg overflow-hidden">
                 <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false)
-                    setIsMobileMenuOpen(false)
-                  }}
+                  onClick={handleLogout}
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
