@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { ChevronDown, ChevronUp, Check, Calendar, Upload } from "lucide-react"
+import { ChevronDown, ChevronUp, Check, Calendar, Upload } from 'lucide-react'
+import { supabase } from "@/lib/supabase"
 
 interface GoalWalletModalProps {
   open: boolean
@@ -23,14 +24,63 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
   const [goalImage, setGoalImage] = useState<File | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  const [lockWallet, setLockWallet] = useState(false)
+  const [lockDuration, setLockDuration] = useState("")
+
   const [smartReminders, setSmartReminders] = useState(false)
   const [flexContributions, setFlexContributions] = useState(false)
 
   const [step, setStep] = useState<"form" | "success">("form")
+  const [isCreating, setIsCreating] = useState(false)
 
-  const handleCreate = () => {
-    // TODO: Implement goal wallet creation logic
-    setStep("success")
+  const handleCreate = async () => {
+    setIsCreating(true)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        alert("Please log in to create a goal wallet")
+        setIsCreating(false)
+        return
+      }
+
+      const { data: wallet, error } = await supabase
+        .from("goal_wallets")
+        .insert({
+          user_id: user.id,
+          name: goalName,
+          target_amount: Number.parseFloat(targetAmount),
+          balance: 0,
+          target_date: deadline || null,
+          funding_source: fundingSource,
+          smart_reminders: smartReminders,
+          flex_contributions: flexContributions,
+          is_locked: lockWallet,
+          locked: lockWallet,
+          lock_until: lockDuration 
+            ? new Date(Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000).toISOString() 
+            : null,
+          lock_duration_days: lockDuration ? Number.parseInt(lockDuration) : null,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error("[v0] Error creating goal wallet:", error)
+        alert("Failed to create goal wallet: " + error.message)
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Goal wallet created:", wallet)
+      setStep("success")
+    } catch (error) {
+      console.error("[v0] Unexpected error:", error)
+      alert("An unexpected error occurred")
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const handleClose = () => {
@@ -40,6 +90,8 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
     setFundingSource("manual")
     setGoalImage(null)
     setShowAdvanced(false)
+    setLockWallet(false)
+    setLockDuration("")
     setSmartReminders(false)
     setFlexContributions(false)
     setStep("form")
@@ -157,6 +209,35 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
                 </div>
               </div>
 
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="lockWallet" className="text-base">
+                      Lock Wallet
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Lock funds until a specific date.</p>
+                  </div>
+                  <Switch id="lockWallet" checked={lockWallet} onCheckedChange={setLockWallet} />
+                </div>
+
+                {lockWallet && (
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="lockDuration">Lock Duration (in days)</Label>
+                    <Input
+                      id="lockDuration"
+                      type="number"
+                      placeholder="e.g., 30"
+                      value={lockDuration}
+                      onChange={(e) => setLockDuration(e.target.value)}
+                      className="bg-background"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Funds will be locked for this many days from creation.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="flex w-full items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3 text-primary transition-colors hover:bg-primary/10"
@@ -193,15 +274,15 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent">
+              <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent" disabled={isCreating}>
                 Cancel
               </Button>
               <Button
                 onClick={handleCreate}
                 className="flex-1 bg-primary hover:bg-primary/90"
-                disabled={!goalName || !targetAmount || !deadline}
+                disabled={!goalName || !targetAmount || !deadline || isCreating}
               >
-                Create Goal
+                {isCreating ? "Creating..." : "Create Goal"}
               </Button>
             </div>
           </>

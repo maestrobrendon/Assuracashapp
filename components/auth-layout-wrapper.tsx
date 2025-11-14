@@ -1,7 +1,7 @@
 "use client"
 
 import { Sidebar } from "@/components/sidebar"
-import { usePathname } from "next/navigation"
+import { usePathname } from 'next/navigation'
 import type React from "react"
 
 export function AuthLayoutWrapper({
@@ -15,7 +15,7 @@ export function AuthLayoutWrapper({
   return (
     <>
       {!isAuthPage && <Sidebar />}
-      <main className={!isAuthPage ? "lg:pl-64" : ""}>{children}</main>
+      <main className={!isAuthPage ? "pt-16 lg:pt-0 lg:pl-64" : ""}>{children}</main>
     </>
   )
 }

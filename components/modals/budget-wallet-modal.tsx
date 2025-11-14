@@ -103,6 +103,12 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
             funding_source: fundingSource,
             smart_reminders: smartReminders,
             flex_contributions: flexContributions,
+            is_locked: lockWallet,
+            locked: lockWallet,
+            lock_until: lockDuration 
+              ? new Date(Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000).toISOString() 
+              : null,
+            lock_duration_days: lockDuration ? Number.parseInt(lockDuration) : null,
           })
           .select()
           .single()
@@ -398,6 +404,35 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
                           className="hidden"
                         />
                       </label>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="lockGoalWallet" className="text-base">
+                          Lock Wallet
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Lock funds until a specific date.</p>
+                      </div>
+                      <Switch id="lockGoalWallet" checked={lockWallet} onCheckedChange={setLockWallet} />
+                    </div>
+
+                    {lockWallet && (
+                      <div className="space-y-2 pt-2">
+                        <Label htmlFor="lockDurationGoal">Lock Duration (in days)</Label>
+                        <Input
+                          id="lockDurationGoal"
+                          type="number"
+                          placeholder="e.g., 30"
+                          value={lockDuration}
+                          onChange={(e) => setLockDuration(e.target.value)}
+                          className="bg-background"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Funds will be locked for this many days from creation.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </>
