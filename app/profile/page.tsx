@@ -1,16 +1,47 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Shield, Wallet, Settings, Bell, Lock, Download, Upload } from "lucide-react"
+import { useRouter } from 'next/navigation'
+import { Shield, Wallet, Settings, Bell, Lock, Download, Upload, ChevronRight, User, CreditCard, FileText, DollarSign, HelpCircle, LogOut, Trash2, Globe, Moon, Sun, Fingerprint, Eye, EyeOff, Mail, Phone, MessageSquare, Gift, Star, Building2, UserCheck, Award as IdCard, Receipt, FileCheck, BarChart3, Percent } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { supabase } from "@/lib/supabase/client"
+import { Separator } from "@/components/ui/separator"
+import { supabase } from "@/lib/supabase"
+import { useMainWallet } from "@/lib/hooks/use-main-wallet"
+import { useToast } from "@/hooks/use-toast"
+
+type UserSettings = {
+  biometric_enabled: boolean
+  show_dashboard_balances: boolean
+  interest_enabled: boolean
+  dark_mode_enabled: boolean
+  default_shielded: boolean
+  hide_balances: boolean
+  encrypt_memos: boolean
+  transaction_alerts: boolean
+  circle_updates: boolean
+  budget_alerts: boolean
+  goal_milestones: boolean
+  security_alerts: boolean
+  push_notifications: boolean
+  email_notifications: boolean
+  sms_notifications: boolean
+  marketing_communications: boolean
+  two_factor_enabled: boolean
+  kyc_verified: boolean
+  nin: string | null
+  rewards_points: number
+}
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const { balance, refetch: refetchBalance } = useMainWallet()
+  
   const [profile, setProfile] = useState<{
     full_name: string
     email: string
@@ -19,47 +50,136 @@ export default function ProfilePage() {
     created_at: string
     initials: string
   } | null>(null)
+  
+  const [settings, setSettings] = useState<UserSettings>({
+    biometric_enabled: false,
+    show_dashboard_balances: true,
+    interest_enabled: false,
+    dark_mode_enabled: false,
+    default_shielded: true,
+    hide_balances: false,
+    encrypt_memos: true,
+    transaction_alerts: true,
+    circle_updates: true,
+    budget_alerts: true,
+    goal_milestones: true,
+    security_alerts: true,
+    push_notifications: true,
+    email_notifications: true,
+    sms_notifications: false,
+    marketing_communications: false,
+    two_factor_enabled: false,
+    kyc_verified: false,
+    nin: null,
+    rewards_points: 0
+  })
+  
+  const [stats, setStats] = useState({
+    totalBalance: 0,
+    circleCount: 0,
+    transactionCount: 0
+  })
+  
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    async function loadProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    loadProfileData()
+  }, [])
 
-      if (user) {
-        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  async function loadProfileData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-        if (profileData) {
-          const names = profileData.full_name?.split(" ") || ["User"]
-          const initials = names
-            .map((n: string) => n[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2)
+      // Load profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
 
-          setProfile({
-            full_name: profileData.full_name || "User",
-            email: profileData.email || user.email || "",
-            phone: profileData.phone || "",
-            zcash_id: profileData.zcash_id || "",
-            created_at: profileData.created_at,
-            initials,
-          })
-        }
+      if (profileData) {
+        const names = profileData.full_name?.split(" ") || ["User"]
+        const initials = names.map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+        setProfile({
+          full_name: profileData.full_name || "User",
+          email: profileData.email || user.email || "",
+          phone: profileData.phone || "",
+          zcash_id: profileData.zcash_id || "",
+          created_at: profileData.created_at,
+          initials,
+        })
       }
+
+      // Load settings
+      const { data: settingsData } = await supabase
+        .from("user_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+
+      if (settingsData) {
+        setSettings(settingsData)
+      }
+
+      // Load stats
+      const [circlesRes, transactionsRes] = await Promise.all([
+        supabase.from("circle_members").select("id", { count: "exact" }).eq("user_id", user.id),
+        supabase.from("transactions").select("id", { count: "exact" }).or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      ])
+
+      setStats({
+        totalBalance: balance,
+        circleCount: circlesRes.count || 0,
+        transactionCount: transactionsRes.count || 0
+      })
+
+    } catch (error) {
+      console.error("[v0] Error loading profile:", error)
+    } finally {
       setIsLoading(false)
     }
+  }
 
-    loadProfile()
-  }, [])
+  async function updateSetting(key: keyof UserSettings, value: boolean) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { error } = await supabase
+        .from("user_settings")
+        .update({ [key]: value })
+        .eq("user_id", user.id)
+
+      if (error) throw error
+
+      setSettings(prev => ({ ...prev, [key]: value }))
+      
+      toast({
+        title: "Setting updated",
+        description: "Your preference has been saved successfully.",
+      })
+    } catch (error) {
+      console.error("[v0] Error updating setting:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update setting. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push("/auth/login")
+  }
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading profile...</p>
+          <p className="text-muted-foreground">Loading settings...</p>
         </div>
       </div>
     )
@@ -70,199 +190,245 @@ export default function ProfilePage() {
     : "Recently"
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Profile Header */}
-      <div className="mb-8">
-        <div className="flex items-start gap-6">
-          <Avatar className="h-24 w-24 border-4 border-primary/20">
-            <AvatarFallback className="bg-primary/10 text-2xl font-bold text-primary">
-              {profile?.initials || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h2 className="text-3xl font-bold text-foreground">{profile?.full_name || "User"}</h2>
-              <Badge className="bg-primary/10 text-primary">
-                <Shield className="mr-1 h-3 w-3" />
-                Privacy Advocate
-              </Badge>
+    <div className="min-h-screen bg-background pb-24 pt-16 lg:pt-6 lg:pl-72">
+      <div className="px-4 max-w-4xl mx-auto">
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">My Account,</h1>
+              <p className="text-muted-foreground">{profile?.full_name || "User"}</p>
             </div>
-            <p className="mt-1 text-muted-foreground">Member since {memberSince}</p>
-            {profile?.email && <p className="mt-1 text-sm text-muted-foreground">{profile.email}</p>}
-            {profile?.zcash_id && <p className="mt-1 text-sm font-mono text-muted-foreground">{profile.zcash_id}</p>}
-            <div className="mt-4 flex gap-3">
-              <Button variant="outline">
-                <Settings className="mr-2 h-4 w-4" />
-                Edit Profile
-              </Button>
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Export Data
-              </Button>
-            </div>
+            <Avatar className="h-16 w-16 border-2 border-primary/20">
+              <AvatarFallback className="bg-primary text-lg font-bold text-primary-foreground">
+                {profile?.initials || "U"}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
-      </div>
 
-      {/* Account Stats */}
-      <div className="mb-8 grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">125.45 ZEC</div>
-            <p className="text-xs text-muted-foreground">Across 3 wallets</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-3 mb-6">
+          <div className="flex items-center justify-between py-3">
+            <Label htmlFor="biometric" className="text-base font-normal flex items-center gap-2">
+              Enable Finger Print/Face ID
+              <Fingerprint className="h-4 w-4 text-muted-foreground" />
+            </Label>
+            <Switch 
+              id="biometric" 
+              checked={settings.biometric_enabled}
+              onCheckedChange={(checked) => updateSetting('biometric_enabled', checked)}
+            />
+          </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Circles</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">3</div>
-            <p className="text-xs text-muted-foreground">Active memberships</p>
-          </CardContent>
-        </Card>
+          <div className="flex items-center justify-between py-3">
+            <Label htmlFor="show-balances" className="text-base font-normal">
+              Show Dashboard Account Balances
+            </Label>
+            <Switch 
+              id="show-balances" 
+              checked={settings.show_dashboard_balances}
+              onCheckedChange={(checked) => updateSetting('show_dashboard_balances', checked)}
+            />
+          </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">247</div>
-            <p className="text-xs text-muted-foreground">76% shielded</p>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="flex items-center justify-between py-3">
+            <Label htmlFor="interest" className="text-base font-normal flex items-center gap-2">
+              Interest Enabled on Savings (Riba)
+              <Percent className="h-4 w-4 text-emerald-500" />
+            </Label>
+            <Switch 
+              id="interest" 
+              checked={settings.interest_enabled}
+              onCheckedChange={(checked) => updateSetting('interest_enabled', checked)}
+            />
+          </div>
+        </div>
 
-      {/* Settings Sections */}
-      <div className="space-y-6">
-        {/* Privacy Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5" />
-              Privacy Settings
-            </CardTitle>
-            <CardDescription>Manage your privacy and security preferences</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="default-shielded">Default to Shielded Transactions</Label>
-                <p className="text-sm text-muted-foreground">Use shielded addresses by default for maximum privacy</p>
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {/* Quick Stats Cards */}
+          <Card className="bg-card">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <Wallet className="h-6 w-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold text-foreground">
+                  ₦{stats.totalBalance.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Total Balance</p>
               </div>
-              <Switch id="default-shielded" defaultChecked />
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="hide-balances">Hide Balances</Label>
-                <p className="text-sm text-muted-foreground">Mask balance amounts in the UI</p>
+          <Card className="bg-card">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <User className="h-6 w-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold text-foreground">{stats.circleCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">Active Circles</p>
               </div>
-              <Switch id="hide-balances" />
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="memo-encryption">Encrypt Transaction Memos</Label>
-                <p className="text-sm text-muted-foreground">Add end-to-end encryption to transaction notes</p>
+          <Card className="bg-card">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <BarChart3 className="h-6 w-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold text-foreground">{stats.transactionCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">Transactions</p>
               </div>
-              <Switch id="memo-encryption" defaultChecked />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Notification Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notifications
-            </CardTitle>
-            <CardDescription>Choose what updates you want to receive</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="transaction-alerts">Transaction Alerts</Label>
-                <p className="text-sm text-muted-foreground">Get notified of incoming and outgoing transactions</p>
+        <div className="space-y-2">
+          {/* Financial & Rates */}
+          <SettingsItem 
+            icon={<BarChart3 className="h-5 w-5 text-muted-foreground" />}
+            label="Today's Rates"
+            onClick={() => {}}
+          />
+
+          {/* Account Settings */}
+          <SettingsItem 
+            icon={<Settings className="h-5 w-5 text-muted-foreground" />}
+            label="My Account Settings"
+            onClick={() => router.push("/profile/account-settings")}
+          />
+
+          {/* Verification */}
+          <SettingsItem 
+            icon={<IdCard className="h-5 w-5 text-muted-foreground" />}
+            label="Verify NIN"
+            badge={settings.nin ? "Verified" : undefined}
+            onClick={() => {}}
+          />
+
+          {/* Documents */}
+          <SettingsItem 
+            icon={<Receipt className="h-5 w-5 text-muted-foreground" />}
+            label="Generate Account Statement"
+            onClick={() => {}}
+          />
+
+          <SettingsItem 
+            icon={<FileCheck className="h-5 w-5 text-muted-foreground" />}
+            label="Generate Reference Letter"
+            onClick={() => {}}
+          />
+
+          {/* Theme */}
+          <div className="flex items-center justify-between py-4 bg-card rounded-lg px-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-muted p-2">
+                {settings.dark_mode_enabled ? (
+                  <Moon className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <Sun className="h-5 w-5 text-muted-foreground" />
+                )}
               </div>
-              <Switch id="transaction-alerts" defaultChecked />
+              <Label htmlFor="dark-mode" className="text-base font-normal">Enable Dark Mode</Label>
             </div>
+            <Switch 
+              id="dark-mode" 
+              checked={settings.dark_mode_enabled}
+              onCheckedChange={(checked) => updateSetting('dark_mode_enabled', checked)}
+            />
+          </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="circle-updates">Circle Updates</Label>
-                <p className="text-sm text-muted-foreground">Notifications about circle activity and goals</p>
-              </div>
-              <Switch id="circle-updates" defaultChecked />
-            </div>
+          {/* Support */}
+          <SettingsItem 
+            icon={<HelpCircle className="h-5 w-5 text-muted-foreground" />}
+            label="Self Help"
+            onClick={() => {}}
+          />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="weekly-summary">Weekly Summary</Label>
-                <p className="text-sm text-muted-foreground">Receive a weekly financial summary email</p>
-              </div>
-              <Switch id="weekly-summary" />
-            </div>
-          </CardContent>
-        </Card>
+          {/* Security */}
+          <SettingsItem 
+            icon={<Lock className="h-5 w-5 text-muted-foreground" />}
+            label="Security"
+            onClick={() => router.push("/profile/security")}
+          />
 
-        {/* Connected Wallets */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Connected Wallets
-            </CardTitle>
-            <CardDescription>Manage your Zcash wallet connections</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border border-border p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-primary/10 p-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">Main Wallet</p>
-                  <p className="text-sm text-muted-foreground font-mono">{profile?.zcash_id || "zs1abc...3x8k"}</p>
-                </div>
-              </div>
-              <Badge variant="secondary">Default</Badge>
-            </div>
+          {/* Privacy */}
+          <SettingsItem 
+            icon={<Shield className="h-5 w-5 text-muted-foreground" />}
+            label="Privacy Settings"
+            onClick={() => router.push("/profile/privacy")}
+          />
 
-            <Button variant="outline" className="w-full bg-transparent">
-              <Upload className="mr-2 h-4 w-4" />
-              Connect New Wallet
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Notifications */}
+          <SettingsItem 
+            icon={<Bell className="h-5 w-5 text-muted-foreground" />}
+            label="Notifications"
+            onClick={() => router.push("/profile/notifications")}
+          />
 
-        {/* Account Actions */}
-        <Card className="border-destructive/20">
-          <CardHeader>
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
-            <CardDescription>Irreversible account actions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent"
-            >
-              Clear Transaction History
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent"
-            >
-              Delete Account
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Linked Banks */}
+          <SettingsItem 
+            icon={<Building2 className="h-5 w-5 text-muted-foreground" />}
+            label="Linked Bank Accounts"
+            onClick={() => {}}
+          />
+
+          {/* Referrals */}
+          <SettingsItem 
+            icon={<Gift className="h-5 w-5 text-muted-foreground" />}
+            label="Referral Program"
+            onClick={() => {}}
+          />
+        </div>
+
+        <div className="mt-8 space-y-3">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-5 w-5" />
+            Logout
+          </Button>
+
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-5 w-5" />
+            Delete Account
+          </Button>
+        </div>
       </div>
     </div>
+  )
+}
+
+function SettingsItem({
+  icon,
+  label,
+  badge,
+  onClick
+}: {
+  icon: React.ReactNode
+  label: string
+  badge?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-between w-full py-4 bg-card rounded-lg px-4 hover:bg-muted/50 transition-colors"
+    >
+      <div className="flex items-center gap-3">
+        <div className="rounded-full bg-muted p-2">
+          {icon}
+        </div>
+        <span className="text-base font-normal">{label}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {badge && (
+          <Badge variant="secondary" className="text-xs">
+            {badge}
+          </Badge>
+        )}
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      </div>
+    </button>
   )
 }

@@ -123,10 +123,10 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(false)}
+              className="h-9 w-9 hover:bg-muted lg:hidden"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              <Menu className="h-5 w-5" />
+              <X className="h-5 w-5" />
             </Button>
           </div>
 

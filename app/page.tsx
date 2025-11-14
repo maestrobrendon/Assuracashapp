@@ -1,30 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import { supabase } from "@/lib/supabase"
-import {
-  TrendingUp,
-  Users,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  Zap,
-  Send,
-  Download,
-  Target,
-  PiggyBank,
-  ArrowDownLeft,
-  UserPlus,
-  X,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  EyeOff,
-} from "lucide-react"
+import { TrendingUp, Users, ArrowUpRight, ArrowDownRight, Shield, Zap, Send, Download, Target, PiggyBank, ArrowDownLeft, UserPlus, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -38,9 +17,11 @@ import { GoalWalletModal } from "@/components/modals/goal-wallet-modal"
 import { WalletCard } from "@/components/wallet-card"
 import { mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mock-data"
 import { getBudgetWallets, getGoalWallets } from "@/lib/actions/wallets"
+import { useMainWallet } from "@/lib/hooks/use-main-wallet"
 
 export default function HomePage() {
   const router = useRouter()
+  const { balance: mainWalletBalance, refetch: refetchMainWallet } = useMainWallet()
   const [isLoading, setIsLoading] = useState(true)
   const [sendModalOpen, setSendModalOpen] = useState(false)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
@@ -58,7 +39,6 @@ export default function HomePage() {
   const [goalWallets, setGoalWallets] = useState<any[]>([])
   const [isLoadingWallets, setIsLoadingWallets] = useState(true)
 
-  const totalBalance = 125450.45
   const recentTransactions = [
     { id: 1, type: "received", amount: 15500, from: "zs1...3x8k", date: "2 hours ago", shielded: true },
     { id: 2, type: "sent", amount: 5250, to: "zs1...9k2p", date: "5 hours ago", shielded: true },
@@ -115,6 +95,7 @@ export default function HomePage() {
     setBudgetModalOpen(open)
     if (!open) {
       loadWallets()
+      refetchMainWallet() // Refetch main wallet after creating budget wallet
     }
   }
 
@@ -122,42 +103,53 @@ export default function HomePage() {
     setGoalModalOpen(open)
     if (!open) {
       loadWallets()
+      refetchMainWallet() // Refetch main wallet after creating goal wallet
     }
   }
 
   const loadWallets = async () => {
     setIsLoadingWallets(true)
-    const [budgetResult, goalResult] = await Promise.all([getBudgetWallets(), getGoalWallets()])
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) return
 
-    if (budgetResult.data) {
-      setBudgetWallets(
-        budgetResult.data.map((w: any) => ({
+      const [budgetResult, goalResult] = await Promise.all([
+        supabase.from('budget_wallets').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('goal_wallets').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+      ])
+
+      if (budgetResult.data) {
+        console.log('[v0] Budget wallets loaded:', budgetResult.data.length)
+        setBudgetWallets(budgetResult.data.map((w: any) => ({
           id: w.id,
           name: w.name,
-          type: "budget",
+          type: 'budget',
           balance: w.balance,
           spent: 0,
           limit: w.spend_limit || w.balance,
-          color: "from-blue-500 to-cyan-500",
-        })),
-      )
-    }
+          color: 'from-blue-500 to-cyan-500',
+        })))
+      }
 
-    if (goalResult.data) {
-      setGoalWallets(
-        goalResult.data.map((w: any) => ({
+      if (goalResult.data) {
+        console.log('[v0] Goal wallets loaded:', goalResult.data.length)
+        setGoalWallets(goalResult.data.map((w: any) => ({
           id: w.id,
           name: w.name,
-          type: "goal",
-          balance: w.current_amount,
+          type: 'goal',
+          balance: w.balance,
           target: w.target_amount,
-          deadline: w.deadline,
-          color: "from-purple-500 to-pink-500",
-        })),
-      )
+          deadline: w.target_date,
+          color: 'from-purple-500 to-pink-500',
+        })))
+      }
+    } catch (error) {
+      console.error('[v0] Error loading wallets:', error)
+    } finally {
+      setIsLoadingWallets(false)
     }
-
-    setIsLoadingWallets(false)
   }
 
   const checkAuth = async () => {
@@ -221,7 +213,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-foreground">{formatBalance(totalBalance)}</span>
+                  <span className="text-4xl font-bold text-foreground">{formatBalance(mainWalletBalance)}</span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-sm text-success">
                   <TrendingUp className="h-4 w-4" />
@@ -324,21 +316,21 @@ export default function HomePage() {
                       <span className="text-sm text-muted-foreground">Budget Wallets</span>
                       <Zap className="h-4 w-4 text-primary" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(totalBalance * 0.4)}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(mainWalletBalance * 0.4)}</p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-muted-foreground">Goal Wallets</span>
                       <PiggyBank className="h-4 w-4 text-accent" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(totalBalance * 0.3)}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(mainWalletBalance * 0.3)}</p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-muted-foreground">Circles</span>
                       <Users className="h-4 w-4 text-primary" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(totalBalance * 0.2)}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(mainWalletBalance * 0.2)}</p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -534,7 +526,8 @@ export default function HomePage() {
                       <WalletCard
                         key={wallet.id}
                         wallet={wallet}
-                        onClick={() => console.log("[v0] Wallet clicked:", wallet.id)}
+                        // Make wallet cards clickable to navigate to detail page
+                        onClick={() => router.push(`/wallets/budget/${wallet.id}`)}
                       />
                     ))
                   ) : (
@@ -564,7 +557,8 @@ export default function HomePage() {
                       <WalletCard
                         key={wallet.id}
                         wallet={wallet}
-                        onClick={() => console.log("[v0] Wallet clicked:", wallet.id)}
+                        // Make wallet cards clickable to navigate to detail page
+                        onClick={() => router.push(`/wallets/goal/${wallet.id}`)}
                       />
                     ))
                   ) : (
@@ -761,10 +755,10 @@ export default function HomePage() {
         </Card>
       </main>
 
-      <SendMoneyModal open={sendModalOpen} onOpenChange={setSendModalOpen} currentBalance={totalBalance} />
+      <SendMoneyModal open={sendModalOpen} onOpenChange={setSendModalOpen} currentBalance={mainWalletBalance} />
       <RequestMoneyModal open={requestModalOpen} onOpenChange={setRequestModalOpen} />
       <TopUpModal open={topUpModalOpen} onOpenChange={setTopUpModalOpen} />
-      <WithdrawModal open={withdrawModalOpen} onOpenChange={setWithdrawModalOpen} currentBalance={totalBalance} />
+      <WithdrawModal open={withdrawModalOpen} onOpenChange={setWithdrawModalOpen} currentBalance={mainWalletBalance} />
       <BudgetWalletModal open={budgetModalOpen} onOpenChange={handleBudgetModalClose} />
       <GoalWalletModal open={goalModalOpen} onOpenChange={handleGoalModalClose} />
     </div>

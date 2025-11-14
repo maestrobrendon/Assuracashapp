@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { ChevronDown, ChevronUp, Check, Wallet, Target, Calendar, Upload, X } from "lucide-react"
-import { createBudgetWallet, createGoalWallet } from "@/lib/actions/wallets"
+import { ChevronDown, ChevronUp, Check, Wallet, Target, Calendar, Upload, X } from 'lucide-react'
+import { supabase } from "@/lib/supabase"
 
 interface BudgetWalletModalProps {
   open: boolean
@@ -48,53 +48,79 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
     setIsCreating(true)
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        alert("Please log in to create a wallet")
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Creating wallet for user:", user.id)
+
       if (walletType === "budget") {
-        const result = await createBudgetWallet({
-          walletName,
-          budgetAmount: Number.parseFloat(budgetAmount),
-          spendLimit: spendLimit ? Number.parseFloat(spendLimit) : undefined,
-          lockWallet,
-          lockDuration: lockDuration ? Number.parseInt(lockDuration) : undefined,
-          disbursementFrequency,
-          dayOfWeek: disbursementFrequency === "monthly" ? undefined : dayOfWeek,
-          dayOfMonth: disbursementFrequency === "monthly" ? dayOfMonth : undefined,
-          enableRollover,
-          automaticAllocation,
-          allocationFrequency,
-          allocationDay: allocationFrequency === "monthly" ? undefined : allocationDay,
-          allocationDayOfMonth: allocationFrequency === "monthly" ? allocationDayOfMonth : undefined,
-          customNotifications,
-        })
+        const { data: wallet, error } = await supabase
+          .from("budget_wallets")
+          .insert({
+            user_id: user.id,
+            name: walletName,
+            balance: Number.parseFloat(budgetAmount),
+            spend_limit: spendLimit ? Number.parseFloat(spendLimit) : null,
+            is_locked: lockWallet,
+            lock_until: lockDuration 
+              ? new Date(Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000).toISOString() 
+              : null,
+            disbursement_frequency: disbursementFrequency || null,
+            day_of_week: disbursementFrequency === "monthly" ? null : dayOfWeek || null,
+            enable_rollover: enableRollover,
+            automatic_allocation: automaticAllocation,
+            allocation_frequency: allocationFrequency || null,
+            allocation_day: allocationFrequency === "monthly" && allocationDayOfMonth 
+              ? Number.parseInt(allocationDayOfMonth) 
+              : null,
+            custom_notifications: customNotifications,
+          })
+          .select()
+          .single()
 
-        if (result.error) {
-          console.error("[v0] Error:", result.error)
-          alert("Failed to create budget wallet: " + result.error)
+        if (error) {
+          console.error("[v0] Error creating budget wallet:", error)
+          alert("Failed to create budget wallet: " + error.message)
           setIsCreating(false)
           return
         }
+
+        console.log("[v0] Budget wallet created:", wallet)
       } else {
-        const result = await createGoalWallet({
-          goalName: walletName,
-          targetAmount: Number.parseFloat(budgetAmount),
-          goalDeadline,
-          fundingSource,
-          goalImage,
-          smartReminders,
-          flexContributions,
-        })
+        const { data: wallet, error } = await supabase
+          .from("goal_wallets")
+          .insert({
+            user_id: user.id,
+            name: walletName,
+            target_amount: Number.parseFloat(budgetAmount),
+            balance: 0,
+            target_date: goalDeadline || null,
+            funding_source: fundingSource,
+            smart_reminders: smartReminders,
+            flex_contributions: flexContributions,
+          })
+          .select()
+          .single()
 
-        if (result.error) {
-          console.error("[v0] Error:", result.error)
-          alert("Failed to create goal wallet: " + result.error)
+        if (error) {
+          console.error("[v0] Error creating goal wallet:", error)
+          alert("Failed to create goal wallet: " + error.message)
           setIsCreating(false)
           return
         }
+
+        console.log("[v0] Goal wallet created:", wallet)
       }
 
       setStep("success")
     } catch (error) {
       console.error("[v0] Unexpected error:", error)
-      alert("An unexpected error occurred")
+      alert("An unexpected error occurred: " + (error instanceof Error ? error.message : String(error)))
     } finally {
       setIsCreating(false)
     }
