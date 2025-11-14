@@ -16,10 +16,12 @@ export async function createCircle(data: {
   recurringFrequency?: string
 }) {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  console.log("[v0] createCircle - Session user ID:", session?.user?.id)
 
-  if (!user) {
+  if (!session?.user) {
+    console.error("[v0] createCircle - No session found")
     return { error: "Not authenticated" }
   }
 
@@ -32,7 +34,7 @@ export async function createCircle(data: {
       target_amount: data.targetAmount,
       visibility: data.isPublic ? "public" : "private",
       allow_external_contributions: data.allowExternal,
-      created_by: user.id,
+      created_by: session.user.id,
       purpose: data.description || "",
       current_balance: 0,
       member_count: 1,
@@ -47,7 +49,7 @@ export async function createCircle(data: {
 
   const { error: memberError } = await supabase.from("circle_members").insert({
     circle_id: circle.id,
-    user_id: user.id,
+    user_id: session.user.id,
     role: "admin",
   })
 
@@ -61,11 +63,13 @@ export async function createCircle(data: {
 
 export async function getUserCircles() {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  console.log("[v0] getUserCircles - Session user ID:", session?.user?.id)
 
-  if (!user) {
-    return { error: "Not authenticated" }
+  if (!session?.user) {
+    console.error("[v0] getUserCircles - No session found")
+    return { error: "Not authenticated", data: [] }
   }
 
   const { data, error } = await supabase
@@ -76,11 +80,11 @@ export async function getUserCircles() {
         *
       )
     `)
-    .eq("user_id", user.id)
+    .eq("user_id", session.user.id)
 
   if (error) {
     console.error("[v0] Error fetching user circles:", error)
-    return { error: error.message }
+    return { error: error.message, data: [] }
   }
 
   const circles = data?.map((item: any) => ({
@@ -88,7 +92,7 @@ export async function getUserCircles() {
     role: item.role,
   }))
 
-  return { data: circles }
+  return { data: circles || [] }
 }
 
 export async function getPublicCircles() {
@@ -101,8 +105,8 @@ export async function getPublicCircles() {
 
   if (error) {
     console.error("[v0] Error fetching public circles:", error)
-    return { error: error.message }
+    return { error: error.message, data: [] }
   }
 
-  return { data }
+  return { data: data || [] }
 }

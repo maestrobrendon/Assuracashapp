@@ -4,9 +4,34 @@ import { Shield } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 export function Navigation() {
   const pathname = usePathname()
+  const [userInitials, setUserInitials] = useState("U")
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single()
+
+        if (profile?.full_name) {
+          const names = profile.full_name.split(" ")
+          const initials = names
+            .map((n: string) => n[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2)
+          setUserInitials(initials)
+        }
+      }
+    }
+    loadUser()
+  }, [])
 
   const isActive = (path: string) => {
     return pathname === path
@@ -19,7 +44,7 @@ export function Navigation() {
           <div className="flex items-center gap-2">
             <Shield className="h-8 w-8 text-primary" />
             <Link href="/">
-              <h1 className="text-2xl font-bold text-foreground">ZcashFlow</h1>
+              <h1 className="text-2xl font-bold text-foreground">Assura Cash</h1>
             </Link>
           </div>
           <nav className="flex items-center gap-6">
@@ -49,7 +74,9 @@ export function Navigation() {
             </Link>
             <Link href="/profile">
               <Avatar className="h-8 w-8 cursor-pointer border-2 border-transparent hover:border-primary transition-colors">
-                <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">JD</AvatarFallback>
+                <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                  {userInitials}
+                </AvatarFallback>
               </Avatar>
             </Link>
           </nav>

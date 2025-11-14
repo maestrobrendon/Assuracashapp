@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Shield, Wallet, Settings, Bell, Lock, Download, Upload } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -5,25 +8,88 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { supabase } from "@/lib/supabase/client"
 
 export default function ProfilePage() {
+  const [profile, setProfile] = useState<{
+    full_name: string
+    email: string
+    phone: string
+    zcash_id: string
+    created_at: string
+    initials: string
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+
+        if (profileData) {
+          const names = profileData.full_name?.split(" ") || ["User"]
+          const initials = names
+            .map((n: string) => n[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2)
+
+          setProfile({
+            full_name: profileData.full_name || "User",
+            email: profileData.email || user.email || "",
+            phone: profileData.phone || "",
+            zcash_id: profileData.zcash_id || "",
+            created_at: profileData.created_at,
+            initials,
+          })
+        }
+      }
+      setIsLoading(false)
+    }
+
+    loadProfile()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "Recently"
+
   return (
     <div className="min-h-screen bg-background">
       {/* Profile Header */}
       <div className="mb-8">
         <div className="flex items-start gap-6">
           <Avatar className="h-24 w-24 border-4 border-primary/20">
-            <AvatarFallback className="bg-primary/10 text-2xl font-bold text-primary">JD</AvatarFallback>
+            <AvatarFallback className="bg-primary/10 text-2xl font-bold text-primary">
+              {profile?.initials || "U"}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h2 className="text-3xl font-bold text-foreground">John Doe</h2>
+              <h2 className="text-3xl font-bold text-foreground">{profile?.full_name || "User"}</h2>
               <Badge className="bg-primary/10 text-primary">
                 <Shield className="mr-1 h-3 w-3" />
                 Privacy Advocate
               </Badge>
             </div>
-            <p className="mt-1 text-muted-foreground">Member since January 2024</p>
+            <p className="mt-1 text-muted-foreground">Member since {memberSince}</p>
+            {profile?.email && <p className="mt-1 text-sm text-muted-foreground">{profile.email}</p>}
+            {profile?.zcash_id && <p className="mt-1 text-sm font-mono text-muted-foreground">{profile.zcash_id}</p>}
             <div className="mt-4 flex gap-3">
               <Button variant="outline">
                 <Settings className="mr-2 h-4 w-4" />
@@ -162,25 +228,10 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Main Wallet</p>
-                  <p className="text-sm text-muted-foreground">zs1abc...3x8k</p>
+                  <p className="text-sm text-muted-foreground font-mono">{profile?.zcash_id || "zs1abc...3x8k"}</p>
                 </div>
               </div>
               <Badge variant="secondary">Default</Badge>
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-border p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-primary/10 p-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">Savings</p>
-                  <p className="text-sm text-muted-foreground">zs1def...9k2p</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm">
-                Manage
-              </Button>
             </div>
 
             <Button variant="outline" className="w-full bg-transparent">

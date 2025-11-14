@@ -19,17 +19,19 @@ export async function createBudgetWallet(data: {
   customNotifications: boolean
 }) {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  console.log("[v0] createBudgetWallet - Session user ID:", session?.user?.id)
 
-  if (!user) {
+  if (!session?.user) {
+    console.error("[v0] createBudgetWallet - No session found")
     return { error: "Not authenticated" }
   }
 
   const { data: wallet, error } = await supabase
     .from("budget_wallets")
     .insert({
-      user_id: user.id,
+      user_id: session.user.id,
       name: data.walletName,
       balance: data.budgetAmount,
       spend_limit: data.spendLimit,
@@ -64,17 +66,19 @@ export async function createGoalWallet(data: {
   flexContributions: boolean
 }) {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  console.log("[v0] createGoalWallet - Session user ID:", session?.user?.id)
 
-  if (!user) {
+  if (!session?.user) {
+    console.error("[v0] createGoalWallet - No session found")
     return { error: "Not authenticated" }
   }
 
   const { data: wallet, error } = await supabase
     .from("goal_wallets")
     .insert({
-      user_id: user.id,
+      user_id: session.user.id,
       name: data.goalName,
       target_amount: data.targetAmount,
       current_amount: 0,
@@ -97,46 +101,50 @@ export async function createGoalWallet(data: {
 
 export async function getBudgetWallets() {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  console.log("[v0] getBudgetWallets - Session user ID:", session?.user?.id)
 
-  if (!user) {
-    return { error: "Not authenticated" }
+  if (!session?.user) {
+    console.error("[v0] getBudgetWallets - No session found")
+    return { error: "Not authenticated", data: [] }
   }
 
   const { data, error } = await supabase
     .from("budget_wallets")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
 
   if (error) {
     console.error("[v0] Error fetching budget wallets:", error)
-    return { error: error.message }
+    return { error: error.message, data: [] }
   }
 
-  return { data }
+  return { data: data || [] }
 }
 
 export async function getGoalWallets() {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  console.log("[v0] getGoalWallets - Session user ID:", session?.user?.id)
 
-  if (!user) {
-    return { error: "Not authenticated" }
+  if (!session?.user) {
+    console.error("[v0] getGoalWallets - No session found")
+    return { error: "Not authenticated", data: [] }
   }
 
   const { data, error } = await supabase
     .from("goal_wallets")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
 
   if (error) {
     console.error("[v0] Error fetching goal wallets:", error)
-    return { error: error.message }
+    return { error: error.message, data: [] }
   }
 
-  return { data }
+  return { data: data || [] }
 }

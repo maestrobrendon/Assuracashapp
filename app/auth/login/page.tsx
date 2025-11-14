@@ -36,6 +36,17 @@ export default function LoginPage() {
 
       if (signInError) throw signInError
 
+      console.log("[v0] Login successful, user ID:", data.user?.id)
+      console.log("[v0] Session:", data.session)
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // Verify session is established
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      console.log("[v0] Verified session after login:", session?.user?.id)
+
       // Check if profile exists
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user?.id).single()
 
@@ -46,6 +57,7 @@ export default function LoginPage() {
       }
       router.refresh()
     } catch (error: unknown) {
+      console.error("[v0] Login error:", error)
       setError(error instanceof Error ? error.message : "Login failed")
     } finally {
       setIsLoading(false)
@@ -147,8 +159,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-8 text-center text-xs text-white/60">
-          Making <span className="font-semibold">Budgeting</span> sexy {" "}
-          <span className="font-semibold">2025 </span>.
+          Making <span className="font-semibold">Budgeting</span> sexy <span className="font-semibold">2025 </span>.
         </p>
       </div>
     </div>

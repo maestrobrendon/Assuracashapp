@@ -51,7 +51,6 @@ export default function SetupProfilePage() {
     setIsLoading(true)
 
     try {
-      // Create account with email/password
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -64,36 +63,22 @@ export default function SetupProfilePage() {
         },
       })
 
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        throw signUpError
+      }
 
       if (authData.user) {
-        // Create profile
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: authData.user.id,
-          full_name: fullName,
-          email,
-          phone: phoneNumber,
-          zcash_id: `Z${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-        })
-
-        if (profileError) throw profileError
-
-        // Create main wallet
-        const { error: walletError } = await supabase.from("main_wallets").insert({
-          user_id: authData.user.id,
-          balance: 0,
-          currency: "NGN",
-        })
-
-        if (walletError) throw walletError
-
         // Clear session storage
         sessionStorage.removeItem("signup_phone")
         sessionStorage.removeItem("phone_verified")
 
-        // Redirect to dashboard
-        router.push("/")
-        router.refresh()
+        // Show success message
+        setError("Account created! Please check your email to verify your account before logging in.")
+
+        // Redirect to login after a delay
+        setTimeout(() => {
+          router.push("/auth/login")
+        }, 3000)
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to create account")
@@ -236,7 +221,13 @@ export default function SetupProfilePage() {
                   />
                 </div>
 
-                {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+                {error && (
+                  <div
+                    className={`rounded-lg p-3 text-sm ${error.includes("check your email") ? "bg-green-50 text-green-700" : "bg-destructive/10 text-destructive"}`}
+                  >
+                    {error}
+                  </div>
+                )}
 
                 <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                   {isLoading ? "Creating Account..." : "Create a Free Account"}

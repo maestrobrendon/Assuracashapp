@@ -19,4 +19,7 @@ export const supabase =
     },
   })
 
-if (process.env.NODE_ENV !== "production") globalForSupabase.supabase = supabase
+const isDevelopment =
+  typeof window === "undefined" ? process.env.NODE_ENV !== "production" : process.env.NEXT_PUBLIC_ENV !== "production"
+
+if (isDevelopment) globalForSupabase.supabase = supabase

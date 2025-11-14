@@ -17,7 +17,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 
 const navigation = [
@@ -37,6 +37,48 @@ export function Sidebar() {
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [user, setUser] = useState<{ name: string; email: string; initials: string } | null>(null)
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      console.log("[v0] Sidebar - Session user ID:", session?.user?.id)
+
+      if (!session?.user) {
+        console.error("[v0] Sidebar - No session found")
+        return
+      }
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", session.user.id)
+        .single()
+
+      if (error) {
+        console.error("[v0] Sidebar - Error fetching profile:", error)
+        return
+      }
+
+      if (profile) {
+        const names = profile.full_name?.split(" ") || ["User"]
+        const initials = names
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+        setUser({
+          name: profile.full_name || "User",
+          email: profile.email || session.user.email || "",
+          initials,
+        })
+        console.log("[v0] Sidebar - Profile loaded:", profile.full_name)
+      }
+    }
+    loadUser()
+  }, [])
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -157,11 +199,13 @@ export function Sidebar() {
               className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 transition-all hover:bg-muted/50"
             >
               <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">JD</AvatarFallback>
+                <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                  {user?.initials || "U"}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1 text-left overflow-hidden">
-                <p className="text-sm font-semibold text-foreground truncate">James Doe</p>
-                <p className="text-xs text-muted-foreground truncate">james.doe@email.com</p>
+                <p className="text-sm font-semibold text-foreground truncate">{user?.name || "Loading..."}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
               </div>
               <ChevronDown
                 className={`h-4 w-4 text-muted-foreground transition-transform ${isUserMenuOpen ? "rotate-180" : ""}`}
