@@ -139,3 +139,6 @@
     background-color: hsl(var(--warning));
   }
 }
+@theme inline {
+  --font-sans: 'Manrope', 'Manrope Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';}
