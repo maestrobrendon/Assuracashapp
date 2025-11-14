@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Check, Building2, CreditCard, Landmark } from "lucide-react"
+import { Check, Building2, CreditCard, Landmark } from 'lucide-react'
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { createTransaction } from "@/lib/actions/transactions"
 
 interface AddFundsModalProps {
   open: boolean
@@ -17,9 +20,71 @@ export function AddFundsModal({ open, onOpenChange }: AddFundsModalProps) {
   const [amount, setAmount] = useState("")
   const [method, setMethod] = useState("bank")
   const [step, setStep] = useState<"form" | "success">("form")
+  const { toast } = useToast()
 
-  const handleAddFunds = () => {
-    setStep("success")
+  const handleAddFunds = async () => {
+    const addAmount = Number.parseFloat(amount)
+    if (!addAmount || addAmount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to add funds",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Update main wallet balance
+      const { data: walletData, error: walletError } = await supabase
+        .from('main_wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single()
+
+      if (walletError) throw walletError
+
+      const newBalance = (walletData.balance || 0) + addAmount
+
+      const { error: updateError } = await supabase
+        .from('main_wallets')
+        .update({ balance: newBalance })
+        .eq('user_id', user.id)
+
+      if (updateError) throw updateError
+
+      // Create transaction record
+      await createTransaction({
+        userId: user.id,
+        amount: addAmount,
+        type: 'deposit',
+        description: 'Added funds',
+        status: 'completed',
+      })
+
+      setStep("success")
+      
+      toast({
+        title: "Success!",
+        description: `₦${addAmount.toLocaleString()} added to your wallet`,
+      })
+    } catch (error) {
+      console.error('[v0] Error adding funds:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add funds. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleClose = () => {
@@ -119,7 +184,7 @@ export function AddFundsModal({ open, onOpenChange }: AddFundsModalProps) {
                 Cancel
               </Button>
               <Button onClick={handleAddFunds} className="flex-1" disabled={!amount || Number.parseFloat(amount) <= 0}>
-                Continue
+                Add Funds
               </Button>
             </div>
           </>
@@ -130,10 +195,9 @@ export function AddFundsModal({ open, onOpenChange }: AddFundsModalProps) {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
               <Check className="h-8 w-8 text-success" />
             </div>
-            <h3 className="mb-2 text-xl font-bold">Funding Initiated!</h3>
+            <h3 className="mb-2 text-xl font-bold">Funds Added Successfully!</h3>
             <p className="mb-6 text-center text-sm text-muted-foreground">
-              Your funding request for ₦{Number.parseFloat(amount).toLocaleString()} has been initiated. Please complete
-              the payment to add funds to your wallet.
+              ₦{Number.parseFloat(amount).toLocaleString()} has been added to your main wallet
             </p>
             <Button onClick={handleClose} className="w-full">
               Done

@@ -1,37 +1,138 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Copy, CreditCard, Building2, QrCode, Check } from "lucide-react"
+import { Copy, CreditCard, Building2, QrCode, Check, Landmark } from 'lucide-react'
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { createTransaction } from "@/lib/actions/transactions"
 
 interface TopUpModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
+const SAMPLE_LINKED_BANKS = [
+  { id: "1", name: "Access Bank", accountNumber: "0123456789", logo: "🏦" },
+  { id: "2", name: "GTBank", accountNumber: "9876543210", logo: "🏦" },
+  { id: "3", name: "Zenith Bank", accountNumber: "5555666677", logo: "🏦" },
+]
+
 export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
   const [method, setMethod] = useState<"account" | "card" | "bank" | "qr" | null>(null)
   const [amount, setAmount] = useState("")
   const [step, setStep] = useState<"method" | "details" | "success">("method")
+  const [currentBalance, setCurrentBalance] = useState(0)
+  const [selectedBank, setSelectedBank] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const dedicatedAccount = "1234567890"
   const dedicatedBank = "Wema Bank"
 
-  const handleCopyAccount = () => {
-    navigator.clipboard.writeText(dedicatedAccount)
+  useEffect(() => {
+    if (open) {
+      fetchCurrentBalance()
+    }
+  }, [open])
+
+  const fetchCurrentBalance = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('main_wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!error && data) {
+        setCurrentBalance(data.balance)
+      }
+    } catch (error) {
+      console.error('[v0] Error fetching balance:', error)
+    }
   }
 
-  const handleTopUp = () => {
-    setStep("success")
+  const handleCopyAccount = () => {
+    navigator.clipboard.writeText(dedicatedAccount)
+    toast({
+      title: "Copied!",
+      description: "Account number copied to clipboard",
+    })
+  }
+
+  const handleTopUp = async () => {
+    const topUpAmount = Number.parseFloat(amount)
+    if (!topUpAmount || topUpAmount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to top up",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const { data: walletData, error: walletError } = await supabase
+        .from('main_wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single()
+
+      if (walletError) throw walletError
+
+      const newBalance = (walletData.balance || 0) + topUpAmount
+
+      const { error: updateError } = await supabase
+        .from('main_wallets')
+        .update({ balance: newBalance })
+        .eq('user_id', user.id)
+
+      if (updateError) throw updateError
+
+      await createTransaction({
+        userId: user.id,
+        amount: topUpAmount,
+        type: 'deposit',
+        description: `Added funds via ${method === 'card' ? 'card' : method === 'bank' ? 'linked bank' : method === 'qr' ? 'QR code' : 'bank transfer'}`,
+        status: 'completed',
+      })
+
+      setStep("success")
+      
+      toast({
+        title: "Success!",
+        description: `₦${topUpAmount.toLocaleString()} added to your wallet`,
+      })
+    } catch (error) {
+      console.error('[v0] Error topping up:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add funds. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleClose = () => {
     setMethod(null)
     setAmount("")
     setStep("method")
+    setSelectedBank(null)
     onOpenChange(false)
   }
 
@@ -43,7 +144,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">Top Up Wallet</DialogTitle>
               <p className="text-sm text-muted-foreground">
-                Your current balance: <span className="font-semibold text-primary">₦0.00</span>
+                Your current balance: <span className="font-semibold text-primary">₦{currentBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
               </p>
             </DialogHeader>
 
@@ -90,7 +191,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
               >
                 <div className="flex items-start gap-3">
                   <div className="rounded-lg bg-primary/10 p-2">
-                    <Building2 className="h-5 w-5 text-primary" />
+                    <Landmark className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold">Top Up from Linked Bank</h4>
@@ -120,7 +221,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
           </>
         )}
 
-        {step === "method" && method === "account" && (
+        {method === "account" && step === "method" && (
           <>
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">Dedicated Account Number</DialogTitle>
@@ -198,6 +299,110 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
               </Button>
               <Button onClick={handleTopUp} className="flex-1" disabled={!amount}>
                 Top Up
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === "details" && method === "bank" && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Select Linked Bank</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-3">
+                {SAMPLE_LINKED_BANKS.map((bank) => (
+                  <button
+                    key={bank.id}
+                    onClick={() => setSelectedBank(bank.id)}
+                    className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                      selectedBank === bank.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card hover:bg-accent/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-3xl">{bank.logo}</div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{bank.name}</h4>
+                        <p className="text-sm text-muted-foreground">{bank.accountNumber}</p>
+                      </div>
+                      {selectedBank === bank.id && (
+                        <Check className="h-5 w-5 text-primary" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {selectedBank && (
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
+                    <Input
+                      id="amount"
+                      type="number"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep("method")} className="flex-1">
+                Back
+              </Button>
+              <Button onClick={handleTopUp} className="flex-1" disabled={!selectedBank || !amount}>
+                Top Up
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === "details" && method === "qr" && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Top Up via QR Code</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="flex flex-col items-center justify-center">
+                <div className="rounded-xl border-2 border-border bg-muted/50 p-8">
+                  <QrCode className="h-48 w-48 text-muted-foreground" />
+                </div>
+                <p className="mt-4 text-center text-sm text-muted-foreground">
+                  Scan this QR code with your banking app to complete the top-up
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep("method")} className="flex-1">
+                Back
+              </Button>
+              <Button onClick={handleTopUp} className="flex-1" disabled={!amount}>
+                Confirm
               </Button>
             </div>
           </>

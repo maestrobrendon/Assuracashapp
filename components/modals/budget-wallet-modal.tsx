@@ -217,7 +217,7 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
                 <Input
                   id="budgetAmount"
                   type="number"
-                  placeholder={walletType === "budget" ? "200" : "$1200"}
+                  placeholder={walletType === "budget" ? "200" : "50000"}
                   value={budgetAmount}
                   onChange={(e) => setBudgetAmount(e.target.value)}
                   className="bg-background"
@@ -236,7 +236,7 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
                     <Input
                       id="spendLimit"
                       type="text"
-                      placeholder="e.g., $50 per transaction"
+                      placeholder="e.g., ₦5000 per transaction"
                       value={spendLimit}
                       onChange={(e) => setSpendLimit(e.target.value)}
                       className="bg-background"

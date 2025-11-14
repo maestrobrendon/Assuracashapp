@@ -38,13 +38,13 @@ export default function HomePage() {
   const [budgetWallets, setBudgetWallets] = useState<any[]>([])
   const [goalWallets, setGoalWallets] = useState<any[]>([])
   const [isLoadingWallets, setIsLoadingWallets] = useState(true)
-
-  const recentTransactions = [
-    { id: 1, type: "received", amount: 15500, from: "zs1...3x8k", date: "2 hours ago", shielded: true },
-    { id: 2, type: "sent", amount: 5250, to: "zs1...9k2p", date: "5 hours ago", shielded: true },
-    { id: 3, type: "received", amount: 50000, from: "Circle: Team Fund", date: "1 day ago", shielded: false },
-    { id: 4, type: "sent", amount: 12750, to: "t1...4m9n", date: "2 days ago", shielded: false },
-  ]
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+  const [quickStats, setQuickStats] = useState({
+    budgetTotal: 0,
+    goalTotal: 0,
+    circlesTotal: 0,
+    transactionCount: 0,
+  })
 
   const circles = [
     { id: 1, name: "Team Fund", members: 5, balance: 234500 },
@@ -95,7 +95,9 @@ export default function HomePage() {
     setBudgetModalOpen(open)
     if (!open) {
       loadWallets()
-      refetchMainWallet() // Refetch main wallet after creating budget wallet
+      refetchMainWallet()
+      loadTransactions()
+      calculateQuickStats()
     }
   }
 
@@ -103,7 +105,18 @@ export default function HomePage() {
     setGoalModalOpen(open)
     if (!open) {
       loadWallets()
-      refetchMainWallet() // Refetch main wallet after creating goal wallet
+      refetchMainWallet()
+      loadTransactions()
+      calculateQuickStats()
+    }
+  }
+
+  const handleTopUpModalClose = (open: boolean) => {
+    setTopUpModalOpen(open)
+    if (!open) {
+      refetchMainWallet()
+      loadTransactions()
+      calculateQuickStats()
     }
   }
 
@@ -145,11 +158,85 @@ export default function HomePage() {
           color: 'from-purple-500 to-pink-500',
         })))
       }
+
+      calculateQuickStats()
     } catch (error) {
       console.error('[v0] Error loading wallets:', error)
     } finally {
       setIsLoadingWallets(false)
     }
+  }
+
+  const loadTransactions = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (!error && data) {
+        const formattedTransactions = data.map((tx: any) => ({
+          id: tx.id,
+          type: tx.sender_id === user.id ? "sent" : "received",
+          amount: tx.amount,
+          from: tx.sender_id === user.id ? null : tx.description,
+          to: tx.receiver_id === user.id ? null : tx.description,
+          date: formatDate(tx.created_at),
+          shielded: tx.type === 'shielded',
+          description: tx.description,
+        }))
+        
+        setRecentTransactions(formattedTransactions)
+      }
+    } catch (error) {
+      console.error('[v0] Error loading transactions:', error)
+    }
+  }
+
+  const calculateQuickStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const [budgetResult, goalResult, txResult] = await Promise.all([
+        supabase.from('budget_wallets').select('balance').eq('user_id', user.id),
+        supabase.from('goal_wallets').select('balance').eq('user_id', user.id),
+        supabase.from('transactions').select('id').eq('sender_id', user.id),
+      ])
+
+      const budgetTotal = budgetResult.data?.reduce((sum, w) => sum + (w.balance || 0), 0) || 0
+      const goalTotal = goalResult.data?.reduce((sum, w) => sum + (w.balance || 0), 0) || 0
+      const circlesTotal = circles.reduce((sum, c) => sum + c.balance, 0)
+      const transactionCount = txResult.data?.length || 0
+
+      setQuickStats({
+        budgetTotal,
+        goalTotal,
+        circlesTotal,
+        transactionCount,
+      })
+    } catch (error) {
+      console.error('[v0] Error calculating stats:', error)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
+    if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
+    return date.toLocaleDateString()
   }
 
   const checkAuth = async () => {
@@ -171,6 +258,44 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoading) {
       loadWallets()
+      loadTransactions()
+    }
+  }, [isLoading])
+
+  useEffect(() => {
+    if (isLoading) return
+
+    const budgetChannel = supabase
+      .channel('budget-wallet-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_wallets' }, () => {
+        console.log('[v0] Budget wallet changed, reloading...')
+        loadWallets()
+        calculateQuickStats()
+      })
+      .subscribe()
+
+    const goalChannel = supabase
+      .channel('goal-wallet-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goal_wallets' }, () => {
+        console.log('[v0] Goal wallet changed, reloading...')
+        loadWallets()
+        calculateQuickStats()
+      })
+      .subscribe()
+
+    const txChannel = supabase
+      .channel('transaction-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        console.log('[v0] Transaction changed, reloading...')
+        loadTransactions()
+        calculateQuickStats()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(budgetChannel)
+      supabase.removeChannel(goalChannel)
+      supabase.removeChannel(txChannel)
     }
   }, [isLoading])
 
@@ -316,21 +441,21 @@ export default function HomePage() {
                       <span className="text-sm text-muted-foreground">Budget Wallets</span>
                       <Zap className="h-4 w-4 text-primary" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(mainWalletBalance * 0.4)}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(quickStats.budgetTotal)}</p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-muted-foreground">Goal Wallets</span>
                       <PiggyBank className="h-4 w-4 text-accent" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(mainWalletBalance * 0.3)}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(quickStats.goalTotal)}</p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-muted-foreground">Circles</span>
                       <Users className="h-4 w-4 text-primary" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(mainWalletBalance * 0.2)}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatBalanceShort(quickStats.circlesTotal)}</p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -367,7 +492,7 @@ export default function HomePage() {
                         className="absolute right-2 top-2 h-8 w-8 rounded-full z-10"
                         onClick={() => handleDismissRequest(request.id)}
                       >
-                        <X className="h-4 w-4" />
+                        
                       </Button>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -457,7 +582,6 @@ export default function HomePage() {
                   key={contact.id}
                   className="flex flex-col items-center gap-2 flex-shrink-0 group"
                   onClick={() => {
-                    // Pre-select this user and open send modal
                     setSendModalOpen(true)
                   }}
                 >
@@ -526,7 +650,6 @@ export default function HomePage() {
                       <WalletCard
                         key={wallet.id}
                         wallet={wallet}
-                        // Make wallet cards clickable to navigate to detail page
                         onClick={() => router.push(`/wallets/budget/${wallet.id}`)}
                       />
                     ))
@@ -557,7 +680,6 @@ export default function HomePage() {
                       <WalletCard
                         key={wallet.id}
                         wallet={wallet}
-                        // Make wallet cards clickable to navigate to detail page
                         onClick={() => router.push(`/wallets/goal/${wallet.id}`)}
                       />
                     ))
@@ -583,7 +705,7 @@ export default function HomePage() {
               {/* Circles */}
               {activeWalletTab === "circles" && (
                 <div className="space-y-4">
-                  {mockCircles.map((circle) => (
+                  {circles.map((circle) => (
                     <Card
                       key={circle.id}
                       className="group cursor-pointer overflow-hidden border-border/50 bg-card shadow-md transition-all hover:shadow-lg hover:scale-[1.02]"
@@ -757,7 +879,7 @@ export default function HomePage() {
 
       <SendMoneyModal open={sendModalOpen} onOpenChange={setSendModalOpen} currentBalance={mainWalletBalance} />
       <RequestMoneyModal open={requestModalOpen} onOpenChange={setRequestModalOpen} />
-      <TopUpModal open={topUpModalOpen} onOpenChange={setTopUpModalOpen} />
+      <TopUpModal open={topUpModalOpen} onOpenChange={handleTopUpModalClose} />
       <WithdrawModal open={withdrawModalOpen} onOpenChange={setWithdrawModalOpen} currentBalance={mainWalletBalance} />
       <BudgetWalletModal open={budgetModalOpen} onOpenChange={handleBudgetModalClose} />
       <GoalWalletModal open={goalModalOpen} onOpenChange={handleGoalModalClose} />
