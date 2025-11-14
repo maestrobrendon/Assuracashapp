@@ -1,6 +1,6 @@
 "use server"
 
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/server"
 
 export async function createCircle(data: {
   circleName: string
@@ -15,13 +15,12 @@ export async function createCircle(data: {
   recurringAmount?: number
   recurringFrequency?: string
 }) {
+  const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log("[v0] createCircle - Session user ID:", session?.user?.id)
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
-    console.error("[v0] createCircle - No session found")
+  if (!user) {
     return { error: "Not authenticated" }
   }
 
@@ -34,7 +33,7 @@ export async function createCircle(data: {
       target_amount: data.targetAmount,
       visibility: data.isPublic ? "public" : "private",
       allow_external_contributions: data.allowExternal,
-      created_by: session.user.id,
+      created_by: user.id,
       purpose: data.description || "",
       current_balance: 0,
       member_count: 1,
@@ -49,7 +48,7 @@ export async function createCircle(data: {
 
   const { error: memberError } = await supabase.from("circle_members").insert({
     circle_id: circle.id,
-    user_id: session.user.id,
+    user_id: user.id,
     role: "admin",
   })
 
@@ -62,13 +61,12 @@ export async function createCircle(data: {
 }
 
 export async function getUserCircles() {
+  const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log("[v0] getUserCircles - Session user ID:", session?.user?.id)
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
-    console.error("[v0] getUserCircles - No session found")
+  if (!user) {
     return { error: "Not authenticated", data: [] }
   }
 
@@ -80,7 +78,7 @@ export async function getUserCircles() {
         *
       )
     `)
-    .eq("user_id", session.user.id)
+    .eq("user_id", user.id)
 
   if (error) {
     console.error("[v0] Error fetching user circles:", error)
@@ -96,6 +94,8 @@ export async function getUserCircles() {
 }
 
 export async function getPublicCircles() {
+  const supabase = await createClient()
+  
   const { data, error } = await supabase
     .from("circles")
     .select("*")

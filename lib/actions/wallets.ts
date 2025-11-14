@@ -1,6 +1,6 @@
 "use server"
 
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/server"
 
 export async function createBudgetWallet(data: {
   walletName: string
@@ -18,20 +18,19 @@ export async function createBudgetWallet(data: {
   allocationDayOfMonth?: string
   customNotifications: boolean
 }) {
+  const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log("[v0] createBudgetWallet - Session user ID:", session?.user?.id)
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
-    console.error("[v0] createBudgetWallet - No session found")
+  if (!user) {
     return { error: "Not authenticated" }
   }
 
   const { data: wallet, error } = await supabase
     .from("budget_wallets")
     .insert({
-      user_id: session.user.id,
+      user_id: user.id,
       name: data.walletName,
       balance: data.budgetAmount,
       spend_limit: data.spendLimit,
@@ -65,20 +64,19 @@ export async function createGoalWallet(data: {
   smartReminders: boolean
   flexContributions: boolean
 }) {
+  const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log("[v0] createGoalWallet - Session user ID:", session?.user?.id)
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
-    console.error("[v0] createGoalWallet - No session found")
+  if (!user) {
     return { error: "Not authenticated" }
   }
 
   const { data: wallet, error } = await supabase
     .from("goal_wallets")
     .insert({
-      user_id: session.user.id,
+      user_id: user.id,
       name: data.goalName,
       target_amount: data.targetAmount,
       current_amount: 0,
@@ -100,20 +98,19 @@ export async function createGoalWallet(data: {
 }
 
 export async function getBudgetWallets() {
+  const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log("[v0] getBudgetWallets - Session user ID:", session?.user?.id)
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
-    console.error("[v0] getBudgetWallets - No session found")
+  if (!user) {
     return { error: "Not authenticated", data: [] }
   }
 
   const { data, error } = await supabase
     .from("budget_wallets")
     .select("*")
-    .eq("user_id", session.user.id)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -125,20 +122,19 @@ export async function getBudgetWallets() {
 }
 
 export async function getGoalWallets() {
+  const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log("[v0] getGoalWallets - Session user ID:", session?.user?.id)
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
-    console.error("[v0] getGoalWallets - No session found")
+  if (!user) {
     return { error: "Not authenticated", data: [] }
   }
 
   const { data, error } = await supabase
     .from("goal_wallets")
     .select("*")
-    .eq("user_id", session.user.id)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
 
   if (error) {

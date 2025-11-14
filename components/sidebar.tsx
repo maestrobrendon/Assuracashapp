@@ -1,20 +1,8 @@
 "use client"
 
-import {
-  Home,
-  Wallet,
-  Users,
-  BarChart3,
-  Settings,
-  HelpCircle,
-  LogOut,
-  Shield,
-  Menu,
-  X,
-  ChevronDown,
-} from "lucide-react"
+import { Home, Wallet, Users, BarChart3, Settings, HelpCircle, LogOut, Shield, Menu, X, ChevronDown } from 'lucide-react'
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
@@ -41,24 +29,28 @@ export function Sidebar() {
 
   useEffect(() => {
     async function loadUser() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      console.log("[v0] Sidebar - Session user ID:", session?.user?.id)
-
-      if (!session?.user) {
-        console.error("[v0] Sidebar - No session found")
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      
+      if (!authUser) {
+        console.log("[v0] Sidebar - No authenticated user")
         return
       }
+
+      console.log("[v0] Sidebar - User ID:", authUser.id)
 
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("full_name, email")
-        .eq("id", session.user.id)
+        .eq("user_id", authUser.id)
         .single()
 
       if (error) {
-        console.error("[v0] Sidebar - Error fetching profile:", error)
+        console.error("[v0] Sidebar - Error fetching profile:", error.message)
+        setUser({
+          name: authUser.email?.split("@")[0] || "User",
+          email: authUser.email || "",
+          initials: authUser.email?.[0]?.toUpperCase() || "U",
+        })
         return
       }
 
@@ -71,10 +63,9 @@ export function Sidebar() {
           .slice(0, 2)
         setUser({
           name: profile.full_name || "User",
-          email: profile.email || session.user.email || "",
+          email: profile.email || authUser.email || "",
           initials,
         })
-        console.log("[v0] Sidebar - Profile loaded:", profile.full_name)
       }
     }
     loadUser()

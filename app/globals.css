@@ -3,58 +3,61 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Adding @theme block to define color utilities for Tailwind v4 */
+@theme {
+  --color-background: oklch(from hsl(var(--background-hsl)) l c h);
+  --color-foreground: oklch(from hsl(var(--foreground-hsl)) l c h);
+  --color-card: oklch(from hsl(var(--card-hsl)) l c h);
+  --color-card-foreground: oklch(from hsl(var(--card-foreground-hsl)) l c h);
+  --color-popover: oklch(from hsl(var(--popover-hsl)) l c h);
+  --color-popover-foreground: oklch(from hsl(var(--popover-foreground-hsl)) l c h);
+  --color-primary: oklch(from hsl(var(--primary-hsl)) l c h);
+  --color-primary-foreground: oklch(from hsl(var(--primary-foreground-hsl)) l c h);
+  --color-secondary: oklch(from hsl(var(--secondary-hsl)) l c h);
+  --color-secondary-foreground: oklch(from hsl(var(--secondary-foreground-hsl)) l c h);
+  --color-muted: oklch(from hsl(var(--muted-hsl)) l c h);
+  --color-muted-foreground: oklch(from hsl(var(--muted-foreground-hsl)) l c h);
+  --color-accent: oklch(from hsl(var(--accent-hsl)) l c h);
+  --color-accent-foreground: oklch(from hsl(var(--accent-foreground-hsl)) l c h);
+  --color-destructive: oklch(from hsl(var(--destructive-hsl)) l c h);
+  --color-destructive-foreground: oklch(from hsl(var(--destructive-foreground-hsl)) l c h);
+  --color-border: oklch(from hsl(var(--border-hsl)) l c h);
+  --color-input: oklch(from hsl(var(--input-hsl)) l c h);
+  --color-ring: oklch(from hsl(var(--ring-hsl)) l c h);
+  --radius-md: 0.75rem;
+}
+
 :root {
-  /* Updated to match reference design - clean light neutral palette */
-  --background: 210 20% 98%; /* #FAFBFC Very light gray background */
-  --foreground: 216 24% 16%; /* #2D3748 Dark charcoal */
-
-  --card: 0 0% 100%; /* Pure white cards */
-  --card-foreground: 216 24% 16%;
-
-  --popover: 0 0% 100%;
-  --popover-foreground: 216 24% 16%;
-
-  /* Primary color - keeping Assura orange but can adjust */
-  --primary: 25 95% 60%; /* Orange */
-  --primary-foreground: 0 0% 100%;
-
-  /* Secondary - light gray for subtle elements */
-  --secondary: 210 20% 96%; /* Very light gray */
-  --secondary-foreground: 216 24% 16%;
-
-  --muted: 210 20% 96%; /* Light neutral gray */
-  --muted-foreground: 215 16% 47%; /* Medium gray text */
-
-  --accent: 25 95% 60%; /* Orange accent */
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-
-  /* Subtle borders like reference design */
-  --border: 214 32% 91%; /* Very light border */
-  --input: 214 32% 91%;
-  --ring: 25 95% 60%;
-
-  /* Success and other utility colors */
+  --background-hsl: 210 20% 98%;
+  --foreground-hsl: 216 24% 16%;
+  --card-hsl: 0 0% 100%;
+  --card-foreground-hsl: 216 24% 16%;
+  --popover-hsl: 0 0% 100%;
+  --popover-foreground-hsl: 216 24% 16%;
+  --primary-hsl: 25 95% 60%;
+  --primary-foreground-hsl: 0 0% 100%;
+  --secondary-hsl: 210 20% 96%;
+  --secondary-foreground-hsl: 216 24% 16%;
+  --muted-hsl: 210 20% 96%;
+  --muted-foreground-hsl: 215 16% 47%;
+  --accent-hsl: 25 95% 60%;
+  --accent-foreground-hsl: 0 0% 100%;
+  --destructive-hsl: 0 84% 60%;
+  --destructive-foreground-hsl: 0 0% 100%;
+  --border-hsl: 214 32% 91%;
+  --input-hsl: 214 32% 91%;
+  --ring-hsl: 25 95% 60%;
   --success: 158 100% 45%;
   --success-foreground: 0 0% 100%;
-
   --warning: 38 92% 50%;
   --warning-foreground: 0 0% 100%;
-
-  /* Chart colors */
   --chart-1: 25 95% 60%;
   --chart-2: 158 100% 45%;
   --chart-3: 267 100% 62%;
   --chart-4: 176 62% 55%;
   --chart-5: 0 100% 71%;
-
-  /* Increased radius for modern look matching reference */
-  --radius: 0.75rem; /* 12px - consistent with reference design */
-
-  /* Sidebar colors */
-  --sidebar: 0 0% 100%; /* White sidebar */
+  --radius: 0.75rem;
+  --sidebar: 0 0% 100%;
   --sidebar-foreground: 216 24% 16%;
   --sidebar-primary: 25 95% 60%;
   --sidebar-primary-foreground: 0 0% 100%;
@@ -65,25 +68,25 @@
 }
 
 .dark {
-  --background: 216 24% 10%;
-  --foreground: 210 20% 98%;
-  --card: 216 24% 12%;
-  --card-foreground: 210 20% 98%;
-  --popover: 216 24% 12%;
-  --popover-foreground: 210 20% 98%;
-  --primary: 25 95% 60%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 216 24% 18%;
-  --secondary-foreground: 210 20% 98%;
-  --muted: 216 24% 18%;
-  --muted-foreground: 215 14% 60%;
-  --accent: 25 95% 60%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 216 24% 18%;
-  --input: 216 24% 18%;
-  --ring: 25 95% 60%;
+  --background-hsl: 216 24% 10%;
+  --foreground-hsl: 210 20% 98%;
+  --card-hsl: 216 24% 12%;
+  --card-foreground-hsl: 210 20% 98%;
+  --popover-hsl: 216 24% 12%;
+  --popover-foreground-hsl: 210 20% 98%;
+  --primary-hsl: 25 95% 60%;
+  --primary-foreground-hsl: 0 0% 100%;
+  --secondary-hsl: 216 24% 18%;
+  --secondary-foreground-hsl: 210 20% 98%;
+  --muted-hsl: 216 24% 18%;
+  --muted-foreground-hsl: 215 14% 60%;
+  --accent-hsl: 25 95% 60%;
+  --accent-foreground-hsl: 0 0% 100%;
+  --destructive-hsl: 0 84% 60%;
+  --destructive-foreground-hsl: 0 0% 100%;
+  --border-hsl: 216 24% 18%;
+  --input-hsl: 216 24% 18%;
+  --ring-hsl: 25 95% 60%;
   --success: 158 100% 45%;
   --success-foreground: 0 0% 100%;
   --warning: 38 92% 50%;
@@ -98,85 +101,40 @@
   --sidebar-ring: 25 95% 60%;
 }
 
-@theme inline {
-  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: hsl(var(--border-hsl));
+    outline-color: hsl(var(--ring-hsl) / 0.5);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background-hsl));
+    color: hsl(var(--foreground-hsl));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-
   button,
   a,
   [role="button"] {
-    @apply transition-all duration-200 ease-out;
+    transition: all 200ms ease-out;
   }
 }
 
-/* Wrapped custom utilities in @layer utilities to fix Tailwind v4 error */
 @layer utilities {
   .card-shadow {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
   }
-
   .card-shadow-lg {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
   }
-
   .text-success {
     color: hsl(var(--success));
   }
-
   .bg-success {
     background-color: hsl(var(--success));
   }
-
   .text-warning {
     color: hsl(var(--warning));
   }
-
   .bg-warning {
     background-color: hsl(var(--warning));
   }
