@@ -1,25 +1,19 @@
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// 🔥 Fix hot reload: use one global instance only
-const globalForSupabase = globalThis as unknown as {
-  supabase?: ReturnType<typeof createClient>
+// Create a singleton instance for the browser using SSR-compatible client
+let client: ReturnType<typeof createBrowserClient> | undefined
+
+export function getSupabaseBrowserClient() {
+  if (client) {
+    return client
+  }
+
+  client = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  return client
 }
 
-export const supabase =
-  globalForSupabase.supabase ??
-  createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      storageKey: "assuracash-auth",
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  })
-
-const isDevelopment =
-  typeof window === "undefined" ? process.env.NODE_ENV !== "production" : process.env.NEXT_PUBLIC_ENV !== "production"
-
-if (isDevelopment) globalForSupabase.supabase = supabase
+// Export singleton instance for backward compatibility
+export const supabase = getSupabaseBrowserClient()

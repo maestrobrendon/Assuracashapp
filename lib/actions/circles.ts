@@ -1,6 +1,6 @@
 "use server"
 
-import { supabase } from "@/lib/supabase"
+import { createServerClient } from "@/lib/supabase/server"
 
 export async function createCircle(data: {
   circleName: string
@@ -15,6 +15,7 @@ export async function createCircle(data: {
   recurringAmount?: number
   recurringFrequency?: string
 }) {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -62,6 +63,7 @@ export async function createCircle(data: {
 }
 
 export async function getUserCircles() {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -96,6 +98,7 @@ export async function getUserCircles() {
 }
 
 export async function getPublicCircles() {
+  const supabase = await createServerClient()
   const { data, error } = await supabase
     .from("circles")
     .select("*")

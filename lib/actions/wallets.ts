@@ -1,6 +1,6 @@
 "use server"
 
-import { supabase } from "@/lib/supabase"
+import { createServerClient } from "@/lib/supabase/server"
 
 export async function createBudgetWallet(data: {
   walletName: string
@@ -18,6 +18,7 @@ export async function createBudgetWallet(data: {
   allocationDayOfMonth?: string
   customNotifications: boolean
 }) {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -65,6 +66,7 @@ export async function createGoalWallet(data: {
   smartReminders: boolean
   flexContributions: boolean
 }) {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -100,6 +102,7 @@ export async function createGoalWallet(data: {
 }
 
 export async function getBudgetWallets() {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -125,6 +128,7 @@ export async function getBudgetWallets() {
 }
 
 export async function getGoalWallets() {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
