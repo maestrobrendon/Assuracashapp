@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { ChevronDown } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface MoveMoneyModalProps {
   open: boolean
@@ -32,8 +33,11 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
   const [showFromDropdown, setShowFromDropdown] = useState(false)
   const [showToDropdown, setShowToDropdown] = useState(false)
   const { toast } = useToast()
+  const accountMode = useAccountMode()
 
   const fetchWallets = async () => {
+    if (!accountMode) return
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -45,6 +49,7 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
         .from("main_wallets")
         .select("id, balance")
         .eq("user_id", user.id)
+        .eq("mode", accountMode)
         .single()
 
       if (mainWallet) {
@@ -63,6 +68,7 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
         .from("budget_wallets")
         .select("id, name, balance, locked, is_locked")
         .eq("user_id", user.id)
+        .eq("mode", accountMode)
 
       if (budgetWallets) {
         budgetWallets.forEach((wallet) => {
@@ -85,6 +91,7 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
         .from("goal_wallets")
         .select("id, name, balance")
         .eq("user_id", user.id)
+        .eq("mode", accountMode)
 
       if (goalWallets) {
         goalWallets.forEach((wallet) => {
@@ -275,6 +282,7 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
         description: `Transferred to ${toWallet.name}`,
         status: "completed",
         reference_number: `${refNumber}-OUT`,
+        mode: accountMode, // Add mode field
       })
 
       await supabase.from("transactions").insert({
@@ -287,6 +295,7 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
         description: `Received from ${fromWallet.name}`,
         status: "completed",
         reference_number: `${refNumber}-IN`,
+        mode: accountMode, // Add mode field
       })
 
       console.log("[v0] Transfer completed successfully")

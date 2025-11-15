@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { ChevronDown, ChevronUp, Check, Wallet, Target, Calendar, Upload, X } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface BudgetWalletModalProps {
   open: boolean
@@ -43,6 +44,8 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
 
   const [step, setStep] = useState<"form" | "success">("form")
   const [isCreating, setIsCreating] = useState(false)
+
+  const { accountMode } = useAccountMode()
 
   const handleCreate = async () => {
     setIsCreating(true)
@@ -79,6 +82,7 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
               ? Number.parseInt(allocationDayOfMonth) 
               : null,
             custom_notifications: customNotifications,
+            mode: accountMode,
           })
           .select()
           .single()
@@ -109,6 +113,7 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
               ? new Date(Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000).toISOString() 
               : null,
             lock_duration_days: lockDuration ? Number.parseInt(lockDuration) : null,
+            mode: accountMode,
           })
           .select()
           .single()

@@ -18,10 +18,13 @@ import { WalletCard } from "@/components/wallet-card"
 import { mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mock-data"
 import { getBudgetWallets, getGoalWallets } from "@/lib/actions/wallets"
 import { useMainWallet } from "@/lib/hooks/use-main-wallet"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
+import { DemoModeBanner } from "@/components/demo-mode-banner"
 
 export default function HomePage() {
   const router = useRouter()
   const { balance: mainWalletBalance, refetch: refetchMainWallet } = useMainWallet()
+  const { accountMode, isLoading: isModeLoading } = useAccountMode()
   const [isLoading, setIsLoading] = useState(true)
   const [sendModalOpen, setSendModalOpen] = useState(false)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
@@ -121,6 +124,8 @@ export default function HomePage() {
   }
 
   const loadWallets = async () => {
+    if (isModeLoading) return
+    
     setIsLoadingWallets(true)
     
     try {
@@ -129,8 +134,8 @@ export default function HomePage() {
       if (!user) return
 
       const [budgetResult, goalResult] = await Promise.all([
-        supabase.from('budget_wallets').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('goal_wallets').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+        supabase.from('budget_wallets').select('*').eq('user_id', user.id).eq('mode', accountMode).order('created_at', { ascending: false }),
+        supabase.from('goal_wallets').select('*').eq('user_id', user.id).eq('mode', accountMode).order('created_at', { ascending: false })
       ])
 
       if (budgetResult.data) {
@@ -168,6 +173,8 @@ export default function HomePage() {
   }
 
   const loadTransactions = async () => {
+    if (isModeLoading) return
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -176,6 +183,7 @@ export default function HomePage() {
         .from('transactions')
         .select('*')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .eq('mode', accountMode)
         .order('created_at', { ascending: false })
         .limit(10)
 
@@ -199,14 +207,16 @@ export default function HomePage() {
   }
 
   const calculateQuickStats = async () => {
+    if (isModeLoading) return
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       const [budgetResult, goalResult, txResult] = await Promise.all([
-        supabase.from('budget_wallets').select('balance').eq('user_id', user.id),
-        supabase.from('goal_wallets').select('balance').eq('user_id', user.id),
-        supabase.from('transactions').select('id').eq('sender_id', user.id),
+        supabase.from('budget_wallets').select('balance').eq('user_id', user.id).eq('mode', accountMode),
+        supabase.from('goal_wallets').select('balance').eq('user_id', user.id).eq('mode', accountMode),
+        supabase.from('transactions').select('id').eq('sender_id', user.id).eq('mode', accountMode),
       ])
 
       const budgetTotal = budgetResult.data?.reduce((sum, w) => sum + (w.balance || 0), 0) || 0
@@ -256,14 +266,14 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !isModeLoading) {
       loadWallets()
       loadTransactions()
     }
-  }, [isLoading])
+  }, [isLoading, isModeLoading, accountMode])
 
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || isModeLoading) return
 
     const budgetChannel = supabase
       .channel('budget-wallet-changes')
@@ -297,9 +307,9 @@ export default function HomePage() {
       supabase.removeChannel(goalChannel)
       supabase.removeChannel(txChannel)
     }
-  }, [isLoading])
+  }, [isLoading, isModeLoading])
 
-  if (isLoading) {
+  if (isLoading || isModeLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -313,6 +323,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <DemoModeBanner />
+
         {/* Balance Overview */}
         <div className="mb-8">
           <h2 className="mb-4 text-3xl font-bold text-foreground">Dashboard</h2>

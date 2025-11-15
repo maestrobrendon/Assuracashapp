@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { WalletSettingsModal } from '@/components/modals/wallet-settings-modal'
+import { useAccountMode } from '@/lib/hooks/use-account-mode'
 
 export default function BudgetWalletDetailPage() {
   const router = useRouter()
@@ -25,6 +26,7 @@ export default function BudgetWalletDetailPage() {
   const walletId = params.id as string
 
   const { balance: mainWalletBalance, refetch: refetchMainWallet } = useMainWallet()
+  const accountMode = useAccountMode()
 
   const [wallet, setWallet] = useState<any>(null)
   const [transactions, setTransactions] = useState<any[]>([])
@@ -36,6 +38,8 @@ export default function BudgetWalletDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const loadWalletData = async () => {
+    if (!accountMode) return
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -45,8 +49,8 @@ export default function BudgetWalletDetailPage() {
       }
 
       const [walletResult, txResult] = await Promise.all([
-        supabase.from('budget_wallets').select('*').eq('id', walletId).eq('user_id', user.id).single(),
-        supabase.from('transactions').select('*').eq('wallet_id', walletId).order('created_at', { ascending: false }).limit(50)
+        supabase.from('budget_wallets').select('*').eq('id', walletId).eq('user_id', user.id).eq('mode', accountMode).single(),
+        supabase.from('transactions').select('*').eq('wallet_id', walletId).eq('mode', accountMode).order('created_at', { ascending: false }).limit(50)
       ])
 
       if (walletResult.data) setWallet(walletResult.data)
@@ -147,7 +151,8 @@ export default function BudgetWalletDetailPage() {
         amount: moveAmount,
         type: 'withdrawal',
         description: `Moved to main wallet`,
-        status: 'completed'
+        status: 'completed',
+        mode: accountMode, // Add mode field
       })
 
       setAmount('')
@@ -202,7 +207,8 @@ export default function BudgetWalletDetailPage() {
         amount: addAmount,
         type: 'deposit',
         description: `Added from main wallet`,
-        status: 'completed'
+        status: 'completed',
+        mode: accountMode, // Add mode field
       })
 
       setAmount('')

@@ -12,6 +12,7 @@ import { CreateCircleModal } from "@/components/modals/create-circle-modal"
 import { ContributeCircleModal } from "@/components/modals/contribute-circle-modal"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 export default function CirclesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -23,6 +24,7 @@ export default function CirclesPage() {
   const [myCircles, setMyCircles] = useState<any[]>([])
   const [publicCircles, setPublicCircles] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const accountMode = useAccountMode()
 
   useEffect(() => {
     loadCircles()
@@ -48,6 +50,11 @@ export default function CirclesPage() {
     setIsLoading(true)
     console.log("[v0] Loading circles...")
     
+    if (!accountMode) {
+      setIsLoading(false)
+      return
+    }
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -59,7 +66,6 @@ export default function CirclesPage() {
 
       console.log("[v0] Authenticated user:", user.id)
 
-      // Fetch user's circles through circle_members junction table
       const { data: userCirclesData, error: userCirclesError } = await supabase
         .from('circle_members')
         .select(`
@@ -68,6 +74,7 @@ export default function CirclesPage() {
           circles (*)
         `)
         .eq('user_id', user.id)
+        .eq('mode', accountMode)
 
       console.log("[v0] User circles data:", userCirclesData)
       console.log("[v0] User circles error:", userCirclesError)
@@ -90,11 +97,11 @@ export default function CirclesPage() {
         setMyCircles(formattedCircles)
       }
 
-      // Fetch public circles
       const { data: publicCirclesData, error: publicCirclesError } = await supabase
         .from('circles')
         .select('*')
         .eq('visibility', 'public')
+        .eq('mode', accountMode)
         .order('created_at', { ascending: false })
         .limit(20)
 

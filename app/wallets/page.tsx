@@ -13,10 +13,12 @@ import { GoalWalletModal } from '@/components/modals/goal-wallet-modal'
 import { MoveMoneyModal } from '@/components/modals/move-money-modal'
 import { AddFundsModal } from '@/components/modals/add-funds-modal'
 import { useMainWallet } from '@/lib/hooks/use-main-wallet'
+import { useAccountMode } from '@/lib/hooks/use-account-mode'
 
 export default function WalletsPage() {
   const router = useRouter()
   const { balance: mainWalletBalance, refetch: refetchMainWallet } = useMainWallet()
+  const { accountMode, isLoading: isModeLoading } = useAccountMode()
   
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
   const [goalModalOpen, setGoalModalOpen] = useState(false)
@@ -30,6 +32,8 @@ export default function WalletsPage() {
   const WALLETS_PER_PAGE = 6
 
   const loadWallets = async () => {
+    if (isModeLoading) return
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -39,8 +43,8 @@ export default function WalletsPage() {
       }
 
       const [budgetResult, goalResult] = await Promise.all([
-        supabase.from('budget_wallets').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('goal_wallets').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+        supabase.from('budget_wallets').select('*').eq('user_id', user.id).eq('mode', accountMode).order('created_at', { ascending: false }),
+        supabase.from('goal_wallets').select('*').eq('user_id', user.id).eq('mode', accountMode).order('created_at', { ascending: false })
       ])
 
       if (budgetResult.data) setBudgetWallets(budgetResult.data)
@@ -54,7 +58,9 @@ export default function WalletsPage() {
   }
 
   useEffect(() => {
-    loadWallets()
+    if (!isModeLoading) {
+      loadWallets()
+    }
     
     const channel = supabase
       .channel('wallets-page-changes')
@@ -71,7 +77,7 @@ export default function WalletsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [isModeLoading, accountMode])
 
   const formatNaira = (amount: number) => {
     return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`
@@ -85,7 +91,7 @@ export default function WalletsPage() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
-  if (isLoading) {
+  if (isLoading || isModeLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">

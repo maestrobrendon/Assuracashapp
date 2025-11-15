@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 type Transaction = {
   id: string
@@ -23,6 +24,7 @@ type Transaction = {
   receiver_id: string
   status: string
   reference_number: string
+  mode: string
 }
 
 type Wallet = {
@@ -30,6 +32,7 @@ type Wallet = {
   name: string
   balance: number
   type: 'main' | 'budget' | 'goal'
+  mode: string
 }
 
 const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))']
@@ -41,12 +44,15 @@ export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState("30") // days
   const [selectedWallet, setSelectedWallet] = useState<string>("all")
   const [userId, setUserId] = useState<string>("")
+  const accountMode = useAccountMode()
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [accountMode])
 
   async function loadData() {
+    if (!accountMode) return
+    
     const supabase = createClient()
     
     const { data: { user } } = await supabase.auth.getUser()
@@ -58,23 +64,27 @@ export default function AnalyticsPage() {
       .from('transactions')
       .select('*')
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .eq('mode', accountMode)
       .order('created_at', { ascending: false })
 
     const { data: mainWallet } = await supabase
       .from('main_wallets')
       .select('*')
       .eq('user_id', user.id)
+      .eq('mode', accountMode)
       .single()
 
     const { data: budgetWallets } = await supabase
       .from('budget_wallets')
       .select('*')
       .eq('user_id', user.id)
+      .eq('mode', accountMode)
 
     const { data: goalWallets } = await supabase
       .from('goal_wallets')
       .select('*')
       .eq('user_id', user.id)
+      .eq('mode', accountMode)
 
     const allWallets: Wallet[] = []
     if (mainWallet) {
@@ -82,7 +92,8 @@ export default function AnalyticsPage() {
         id: mainWallet.id,
         name: 'Main Wallet',
         balance: Number(mainWallet.balance) || 0,
-        type: 'main'
+        type: 'main',
+        mode: mainWallet.mode
       })
     }
     if (budgetWallets) {
@@ -90,7 +101,8 @@ export default function AnalyticsPage() {
         id: w.id,
         name: w.name,
         balance: Number(w.balance) || 0,
-        type: 'budget'
+        type: 'budget',
+        mode: w.mode
       }))
     }
     if (goalWallets) {
@@ -98,7 +110,8 @@ export default function AnalyticsPage() {
         id: w.id,
         name: w.name,
         balance: Number(w.balance) || 0,
-        type: 'goal'
+        type: 'goal',
+        mode: w.mode
       }))
     }
 

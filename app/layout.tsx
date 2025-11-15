@@ -2,6 +2,7 @@ import type React from "react"
 import "./globals.css"
 
 import { AuthLayoutWrapper } from "@/components/auth-layout-wrapper"
+import { ThemeProvider } from "@/components/theme-provider"
 
 import { Manrope, Geist_Mono, Geist_Mono as V0_Font_Geist_Mono } from 'next/font/google'
 
@@ -17,9 +18,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${manrope.className} antialiased`}>
-        <AuthLayoutWrapper>{children}</AuthLayoutWrapper>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthLayoutWrapper>{children}</AuthLayoutWrapper>
+        </ThemeProvider>
       </body>
     </html>
   )

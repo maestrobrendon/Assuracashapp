@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
+import { ModeIndicator } from "@/components/mode-indicator"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -98,9 +99,12 @@ export function Sidebar() {
           </div>
           <h1 className="text-base font-semibold text-foreground">Assura Cash</h1>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="h-9 w-9">
-          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ModeIndicator />
+          <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="h-9 w-9">
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
       </div>
 
       {isMobileMenuOpen && (
@@ -118,7 +122,10 @@ export function Sidebar() {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground">
                 <Shield className="h-6 w-6 text-background" />
               </div>
-              <h1 className="text-lg font-semibold text-foreground">Assura Cash</h1>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Assura Cash</h1>
+                <ModeIndicator />
+              </div>
             </div>
             <Button
               variant="ghost"

@@ -10,6 +10,7 @@ import { Check, Building2, CreditCard, Landmark } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { createTransaction } from "@/lib/actions/transactions"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface AddFundsModalProps {
   open: boolean
@@ -21,6 +22,7 @@ export function AddFundsModal({ open, onOpenChange }: AddFundsModalProps) {
   const [method, setMethod] = useState("bank")
   const [step, setStep] = useState<"form" | "success">("form")
   const { toast } = useToast()
+  const accountMode = useAccountMode()
 
   const handleAddFunds = async () => {
     const addAmount = Number.parseFloat(amount)
@@ -44,11 +46,11 @@ export function AddFundsModal({ open, onOpenChange }: AddFundsModalProps) {
         return
       }
 
-      // Update main wallet balance
       const { data: walletData, error: walletError } = await supabase
         .from('main_wallets')
         .select('balance')
         .eq('user_id', user.id)
+        .eq('mode', accountMode)
         .single()
 
       if (walletError) throw walletError
@@ -59,16 +61,17 @@ export function AddFundsModal({ open, onOpenChange }: AddFundsModalProps) {
         .from('main_wallets')
         .update({ balance: newBalance })
         .eq('user_id', user.id)
+        .eq('mode', accountMode)
 
       if (updateError) throw updateError
 
-      // Create transaction record
       await createTransaction({
         userId: user.id,
         amount: addAmount,
         type: 'deposit',
         description: 'Added funds',
         status: 'completed',
+        mode: accountMode,
       })
 
       setStep("success")

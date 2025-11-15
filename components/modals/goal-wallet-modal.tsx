@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { ChevronDown, ChevronUp, Check, Calendar, Upload } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface GoalWalletModalProps {
   open: boolean
@@ -32,6 +33,8 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
 
   const [step, setStep] = useState<"form" | "success">("form")
   const [isCreating, setIsCreating] = useState(false)
+
+  const accountMode = useAccountMode()
 
   const handleCreate = async () => {
     setIsCreating(true)
@@ -62,6 +65,7 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
             ? new Date(Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000).toISOString() 
             : null,
           lock_duration_days: lockDuration ? Number.parseInt(lockDuration) : null,
+          mode: accountMode, // Add mode field
         })
         .select()
         .single()

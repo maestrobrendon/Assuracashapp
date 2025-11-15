@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
-import { Shield, Wallet, Settings, Bell, Lock, Download, Upload, ChevronRight, User, CreditCard, FileText, DollarSign, HelpCircle, LogOut, Trash2, Globe, Moon, Sun, Fingerprint, Eye, EyeOff, Mail, Phone, MessageSquare, Gift, Star, Building2, UserCheck, Award as IdCard, Receipt, FileCheck, BarChart3, Percent } from 'lucide-react'
+import { Shield, Wallet, Settings, Bell, Lock, Download, Upload, ChevronRight, User, CreditCard, FileText, DollarSign, HelpCircle, LogOut, Trash2, Globe, Moon, Sun, Fingerprint, Eye, EyeOff, Mail, Phone, MessageSquare, Gift, Star, Building2, UserCheck, Award as IdCard, Receipt, FileCheck, BarChart3, Percent, Gamepad2, Banknote, ArrowRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,8 +10,19 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase"
 import { useMainWallet } from "@/lib/hooks/use-main-wallet"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 import { useToast } from "@/hooks/use-toast"
 
 type UserSettings = {
@@ -41,6 +52,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
   const { balance, refetch: refetchBalance } = useMainWallet()
+  const { accountMode, isLoading: isModeLoading } = useAccountMode()
   
   const [profile, setProfile] = useState<{
     full_name: string
@@ -81,6 +93,7 @@ export default function ProfilePage() {
   })
   
   const [isLoading, setIsLoading] = useState(true)
+  const [showSwitchToLiveDialog, setShowSwitchToLiveDialog] = useState(false)
 
   useEffect(() => {
     loadProfileData()
@@ -143,17 +156,59 @@ export default function ProfilePage() {
 
   async function updateSetting(key: keyof UserSettings, value: boolean) {
     try {
+      console.log("[v0] Updating setting:", key, "to", value)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.log("[v0] No user found")
+        return
+      }
 
-      const { error } = await supabase
+      console.log("[v0] User ID:", user.id)
+
+      const { data: existingSettings, error: checkError } = await supabase
         .from("user_settings")
-        .update({ [key]: value })
+        .select('*')
         .eq("user_id", user.id)
+        .single()
+
+      console.log("[v0] Existing settings:", existingSettings)
+
+      let error
+
+      if (existingSettings) {
+        console.log("[v0] Updating existing settings")
+        const { error: updateError } = await supabase
+          .from("user_settings")
+          .update({ [key]: value })
+          .eq("user_id", user.id)
+
+        error = updateError
+        console.log("[v0] Update error:", error)
+      } else {
+        console.log("[v0] Creating new settings record")
+        const { error: insertError } = await supabase
+          .from("user_settings")
+          .insert({
+            user_id: user.id,
+            [key]: value,
+          })
+
+        error = insertError
+        console.log("[v0] Insert error:", error)
+      }
 
       if (error) throw error
 
       setSettings(prev => ({ ...prev, [key]: value }))
+      
+      if (key === 'dark_mode_enabled') {
+        console.log("[v0] Toggling dark mode:", value)
+        if (value) {
+          document.documentElement.classList.add('dark')
+        } else {
+          document.documentElement.classList.remove('dark')
+        }
+      }
       
       toast({
         title: "Setting updated",
@@ -163,7 +218,40 @@ export default function ProfilePage() {
       console.error("[v0] Error updating setting:", error)
       toast({
         title: "Error",
-        description: "Failed to update setting. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update setting. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function handleSwitchMode(newMode: 'demo' | 'live') {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_mode: newMode })
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      toast({
+        title: newMode === 'live' ? "Switched to Live Mode" : "Back in Demo Mode",
+        description: newMode === 'live' 
+          ? "Your dashboard is now empty - you're starting fresh with real money."
+          : "Your practice data is still here!",
+      })
+
+      // Refresh the page to reload all data with new mode
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    } catch (error) {
+      console.error("[v0] Error switching mode:", error)
+      toast({
+        title: "Error",
+        description: "Failed to switch account mode. Please try again.",
         variant: "destructive",
       })
     }
@@ -174,7 +262,7 @@ export default function ProfilePage() {
     router.push("/auth/login")
   }
 
-  if (isLoading) {
+  if (isLoading || isModeLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -205,6 +293,94 @@ export default function ProfilePage() {
             </Avatar>
           </div>
         </div>
+
+        <Card className="mb-6 overflow-hidden">
+          <CardHeader className={`${
+            accountMode === 'demo' 
+              ? 'bg-gradient-to-r from-orange-500/10 to-orange-400/10 border-b border-orange-500/20' 
+              : 'bg-gradient-to-r from-emerald-500/10 to-emerald-400/10 border-b border-emerald-500/20'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg mb-1">Account Mode</CardTitle>
+                <CardDescription>Choose how you want to use Assura Cash</CardDescription>
+              </div>
+              <Badge
+                variant="secondary"
+                className={`flex items-center gap-2 px-3 py-2 text-sm ${
+                  accountMode === 'demo'
+                    ? 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30'
+                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                }`}
+              >
+                {accountMode === 'demo' ? (
+                  <>
+                    <Gamepad2 className="h-4 w-4" />
+                    Demo Mode - Playing with fake money
+                  </>
+                ) : (
+                  <>
+                    <Banknote className="h-4 w-4" />
+                    Live Mode - Real money
+                  </>
+                )}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {accountMode === 'demo' ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-muted p-2 flex-shrink-0">
+                    <Gamepad2 className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-1">
+                      You're currently in Demo Mode
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Practice with fake money and explore all features without any risk. Your demo data is saved and you can return anytime.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setShowSwitchToLiveDialog(true)}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  size="lg"
+                >
+                  <Banknote className="mr-2 h-5 w-5" />
+                  Switch to Live Mode
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-muted p-2 flex-shrink-0">
+                    <Banknote className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-1">
+                      You're in Live Mode
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      All transactions use real money. Your funds are secure and protected.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => handleSwitchMode('demo')}
+                  variant="outline"
+                  className="w-full border-orange-500/20 text-orange-600 hover:bg-orange-500/10"
+                  size="lg"
+                >
+                  <Gamepad2 className="mr-2 h-5 w-5" />
+                  Back to Demo Mode
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="space-y-3 mb-6">
           <div className="flex items-center justify-between py-3">
@@ -395,6 +571,63 @@ export default function ProfilePage() {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={showSwitchToLiveDialog} onOpenChange={setShowSwitchToLiveDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="rounded-full bg-emerald-500/20 p-3">
+                <Banknote className="h-6 w-6 text-emerald-600" />
+              </div>
+              <AlertDialogTitle className="text-xl">Switch to Live Mode?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              You're about to switch to Live Mode where you can use real money. Your demo data will remain saved and you can switch back anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 px-6 pb-2">
+            <div className="rounded-lg bg-muted p-4 space-y-2">
+              <div className="font-semibold text-foreground text-sm mb-2">To use Live Mode, you'll need to:</div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                    <UserCheck className="h-3 w-3 text-primary" />
+                  </div>
+                  <span>Complete KYC verification (BVN, NIN)</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                    <CreditCard className="h-3 w-3 text-primary" />
+                  </div>
+                  <span>Get your virtual bank account</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                    <Wallet className="h-3 w-3 text-primary" />
+                  </div>
+                  <span>Fund your wallet with real money</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-sm font-medium text-foreground">
+              Ready to continue?
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSwitchToLiveDialog(false)
+                handleSwitchMode('live')
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Switch to Live
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

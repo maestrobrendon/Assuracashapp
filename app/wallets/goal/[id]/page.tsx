@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useMainWallet } from '@/lib/hooks/use-main-wallet'
+import { useAccountMode } from '@/lib/hooks/use-account-mode'
 import { ArrowLeft, Target, Calendar, TrendingUp, TrendingDown, Plus, Settings, Lock, Unlock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ export default function GoalWalletDetailPage() {
   const walletId = params.id as string
 
   const { balance: mainWalletBalance, refetch: refetchMainWallet } = useMainWallet()
+  const accountMode = useAccountMode()
 
   const [wallet, setWallet] = useState<any>(null)
   const [transactions, setTransactions] = useState<any[]>([])
@@ -36,6 +38,8 @@ export default function GoalWalletDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const loadWalletData = async () => {
+    if (!accountMode) return
+    
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -45,8 +49,8 @@ export default function GoalWalletDetailPage() {
       }
 
       const [walletResult, txResult] = await Promise.all([
-        supabase.from('goal_wallets').select('*').eq('id', walletId).eq('user_id', user.id).single(),
-        supabase.from('transactions').select('*').eq('wallet_id', walletId).order('created_at', { ascending: false }).limit(50)
+        supabase.from('goal_wallets').select('*').eq('id', walletId).eq('user_id', user.id).eq('mode', accountMode).single(),
+        supabase.from('transactions').select('*').eq('wallet_id', walletId).eq('mode', accountMode).order('created_at', { ascending: false }).limit(50)
       ])
 
       if (walletResult.data) setWallet(walletResult.data)
@@ -142,7 +146,8 @@ export default function GoalWalletDetailPage() {
         type: 'deposit',
         description: `Added to ${wallet.name} from main wallet`,
         status: 'completed',
-        reference_number: `GOAL${Date.now()}`
+        reference_number: `GOAL${Date.now()}`,
+        mode: accountMode, // Add mode field
       })
 
       toast({
