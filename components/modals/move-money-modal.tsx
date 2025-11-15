@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label"
 import { ChevronDown } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { transferMoney } from "@/lib/actions/wallets"
 
 interface MoveMoneyModalProps {
   open: boolean
@@ -170,29 +169,121 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
     setIsLoading(true)
 
     try {
-      const result = await transferMoney({
-        fromWalletId: fromWallet.id,
-        fromWalletType: fromWallet.type,
-        toWalletId: toWallet.id,
-        toWalletType: toWallet.type,
-        amount: transferAmount,
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error("Not authenticated")
+      }
+
+      console.log("[v0] Starting transfer from client:", {
+        from: fromWallet.name,
+        to: toWallet.name,
+        amount: transferAmount
       })
 
-      if (result.error) {
-        throw new Error(result.error)
+      const fromTableName = 
+        fromWallet.type === "main" ? "main_wallets" :
+        fromWallet.type === "budget" ? "budget_wallets" : "goal_wallets"
+      
+      const toTableName = 
+        toWallet.type === "main" ? "main_wallets" :
+        toWallet.type === "budget" ? "budget_wallets" : "goal_wallets"
+
+      const { data: fromWalletData, error: fromError } = await supabase
+        .from(fromTableName)
+        .select("balance")
+        .eq("id", fromWallet.id)
+        .single()
+
+      if (fromError || !fromWalletData) {
+        throw new Error("Source wallet not found")
       }
+
+      const { data: toWalletData, error: toError } = await supabase
+        .from(toTableName)
+        .select("balance")
+        .eq("id", toWallet.id)
+        .single()
+
+      if (toError || !toWalletData) {
+        throw new Error("Destination wallet not found")
+      }
+
+      const currentFromBalance = Number(fromWalletData.balance) || 0
+      const currentToBalance = Number(toWalletData.balance) || 0
+
+      if (currentFromBalance < transferAmount) {
+        throw new Error("Insufficient balance")
+      }
+
+      console.log("[v0] Current balances - From:", currentFromBalance, "To:", currentToBalance)
+
+      const { error: updateFromError } = await supabase
+        .from(fromTableName)
+        .update({ balance: currentFromBalance - transferAmount })
+        .eq("id", fromWallet.id)
+
+      if (updateFromError) {
+        console.error("[v0] Error updating from wallet:", updateFromError)
+        throw new Error("Failed to deduct from source wallet")
+      }
+
+      console.log("[v0] Successfully updated from wallet")
+
+      const { error: updateToError } = await supabase
+        .from(toTableName)
+        .update({ balance: currentToBalance + transferAmount })
+        .eq("id", toWallet.id)
+
+      if (updateToError) {
+        console.error("[v0] Error updating to wallet:", updateToError)
+        await supabase
+          .from(fromTableName)
+          .update({ balance: currentFromBalance })
+          .eq("id", fromWallet.id)
+        throw new Error("Failed to add to destination wallet")
+      }
+
+      console.log("[v0] Successfully updated to wallet")
+
+      const refNumber = `TXN${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+
+      await supabase.from("transactions").insert({
+        sender_id: user.id,
+        receiver_id: user.id,
+        wallet_id: fromWallet.id,
+        amount: transferAmount,
+        currency: "NGN",
+        type: "withdrawal",
+        description: `Transferred to ${toWallet.name}`,
+        status: "completed",
+        reference_number: `${refNumber}-OUT`,
+      })
+
+      await supabase.from("transactions").insert({
+        sender_id: user.id,
+        receiver_id: user.id,
+        wallet_id: toWallet.id,
+        amount: transferAmount,
+        currency: "NGN",
+        type: "deposit",
+        description: `Received from ${fromWallet.name}`,
+        status: "completed",
+        reference_number: `${refNumber}-IN`,
+      })
+
+      console.log("[v0] Transfer completed successfully")
 
       toast({
         title: "Transfer Successful",
         description: `${formatNaira(transferAmount)} moved from ${fromWallet.name} to ${toWallet.name}`,
       })
 
-      // Reset form
       setAmount("")
       setToWallet(null)
+      
       await fetchWallets()
       
-      // Close modal after short delay
       setTimeout(() => {
         onOpenChange(false)
       }, 1500)
@@ -229,7 +320,6 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* From Wallet Section */}
           <div className="space-y-2">
             <Label className="text-sm">From Wallet</Label>
             <div className="relative">
@@ -249,7 +339,6 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </button>
 
-              {/* From Wallet Dropdown */}
               {showFromDropdown && (
                 <div className="absolute z-50 w-full mt-1 rounded-lg border bg-card shadow-lg max-h-[240px] overflow-y-auto">
                   {unlockedWallets.length === 0 ? (
@@ -264,7 +353,6 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
                         onClick={() => {
                           setFromWallet(wallet)
                           setShowFromDropdown(false)
-                          // Reset to wallet if same as new from wallet
                           if (toWallet?.id === wallet.id) {
                             setToWallet(null)
                           }
@@ -290,7 +378,6 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
             </div>
           </div>
 
-          {/* To Wallet Section with Dropdown */}
           <div className="space-y-2">
             <Label className="text-sm">To Wallet</Label>
             <div className="relative">
@@ -312,7 +399,6 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </button>
 
-              {/* Dropdown Menu */}
               {showToDropdown && (
                 <div className="absolute z-50 w-full mt-1 rounded-lg border bg-card shadow-lg max-h-[240px] overflow-y-auto">
                   {availableToWallets.length === 0 ? (
@@ -349,7 +435,6 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
             </div>
           </div>
 
-          {/* Amount Input */}
           {toWallet && (
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-sm">Amount</Label>

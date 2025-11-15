@@ -55,6 +55,22 @@ export default function WalletsPage() {
 
   useEffect(() => {
     loadWallets()
+    
+    const channel = supabase
+      .channel('wallets-page-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_wallets' }, () => {
+        console.log('[v0] Budget wallet changed, reloading...')
+        loadWallets()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goal_wallets' }, () => {
+        console.log('[v0] Goal wallet changed, reloading...')
+        loadWallets()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const formatNaira = (amount: number) => {
@@ -355,7 +371,16 @@ export default function WalletsPage() {
             refetchMainWallet() // Refetch main wallet balance after modal closes
           }
         }} />
-        <MoveMoneyModal open={moveMoneyModalOpen} onOpenChange={setMoveMoneyModalOpen} />
+        <MoveMoneyModal 
+          open={moveMoneyModalOpen} 
+          onOpenChange={(open) => {
+            setMoveMoneyModalOpen(open)
+            if (!open) {
+              loadWallets()
+              refetchMainWallet()
+            }
+          }} 
+        />
         <AddFundsModal open={addFundsModalOpen} onOpenChange={setAddFundsModalOpen} />
       </main>
     </div>

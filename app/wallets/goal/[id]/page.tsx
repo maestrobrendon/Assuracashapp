@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useMainWallet } from '@/lib/hooks/use-main-wallet'
-import { ArrowLeft, Target, Calendar, TrendingUp, TrendingDown, Plus } from 'lucide-react'
+import { ArrowLeft, Target, Calendar, TrendingUp, TrendingDown, Plus, Settings, Lock, Unlock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { WalletSettingsModal } from '@/components/modals/wallet-settings-modal'
 
 export default function GoalWalletDetailPage() {
   const router = useRouter()
@@ -28,6 +30,7 @@ export default function GoalWalletDetailPage() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -42,7 +45,7 @@ export default function GoalWalletDetailPage() {
 
       const [walletResult, txResult] = await Promise.all([
         supabase.from('goal_wallets').select('*').eq('id', walletId).eq('user_id', user.id).single(),
-        supabase.from('transactions').select('*').eq('wallet_id', walletId).order('created_at', { ascending: false }).limit(20)
+        supabase.from('transactions').select('*').eq('wallet_id', walletId).order('created_at', { ascending: false }).limit(50)
       ])
 
       if (walletResult.data) setWallet(walletResult.data)
@@ -59,66 +62,24 @@ export default function GoalWalletDetailPage() {
     if (walletId) loadWalletData()
   }, [walletId])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(`wallet-${walletId}-changes`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "goal_wallets", filter: `id=eq.${walletId}` }, loadWalletData)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "transactions", filter: `wallet_id=eq.${walletId}` }, loadWalletData)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [walletId])
+
   const formatNaira = (amount: number) => {
     return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`
   }
 
   const progress = wallet ? (wallet.balance / wallet.target_amount) * 100 : 0
-
-  const handleAddFromMain = async () => {
-    if (!amount || Number.parseFloat(amount) <= 0) {
-      alert('Please enter a valid amount')
-      return
-    }
-
-    if (Number.parseFloat(amount) > mainWalletBalance) {
-      alert('Insufficient balance in main wallet')
-      return
-    }
-
-    setIsProcessing(true)
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) return
-
-      const addAmount = Number.parseFloat(amount)
-
-      const { error: goalError } = await supabase
-        .from('goal_wallets')
-        .update({ balance: wallet.balance + addAmount })
-        .eq('id', walletId)
-
-      if (goalError) throw goalError
-
-      const { error: mainError } = await supabase
-        .from('main_wallets')
-        .update({ balance: mainWalletBalance - addAmount })
-        .eq('user_id', user.id)
-
-      if (mainError) throw mainError
-
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        wallet_id: walletId,
-        amount: addAmount,
-        type: 'deposit',
-        description: `Added to goal: ${wallet.name}`,
-        status: 'completed'
-      })
-
-      setAmount('')
-      setAddModalOpen(false)
-      loadWalletData()
-      refetchMainWallet()
-    } catch (error) {
-      console.error('[v0] Error adding money:', error)
-      alert('Failed to add money')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
+  const isLocked = wallet?.is_locked && wallet?.lock_until && new Date(wallet.lock_until) > new Date()
 
   if (isLoading) {
     return (
@@ -161,7 +122,27 @@ export default function GoalWalletDetailPage() {
                 <CardTitle className="text-2xl font-bold">{wallet.name}</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">Goal Wallet</p>
               </div>
-              <Target className="h-8 w-8 text-primary" />
+              <div className="flex items-center gap-2">
+                {isLocked ? (
+                  <Badge variant="secondary" className="text-sm">
+                    <Lock className="mr-1 h-4 w-4" />
+                    Locked
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-sm">
+                    <Unlock className="mr-1 h-4 w-4" />
+                    Unlocked
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSettingsModalOpen(true)}
+                  className="h-8 w-8"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -195,6 +176,7 @@ export default function GoalWalletDetailPage() {
               onClick={() => setAddModalOpen(true)}
               className="w-full"
               size="lg"
+              disabled={isLocked}
             >
               <Plus className="mr-2 h-5 w-5" />
               Add to Goal
@@ -278,6 +260,20 @@ export default function GoalWalletDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <WalletSettingsModal
+          open={settingsModalOpen}
+          onOpenChange={setSettingsModalOpen}
+          wallet={{
+            id: wallet.id,
+            name: wallet.name,
+            type: "goal",
+            locked: wallet.locked,
+            isLocked: wallet.is_locked,
+            lockDurationDays: wallet.lock_duration_days,
+          }}
+          onUpdate={loadWalletData}
+        />
       </main>
     </div>
   )
