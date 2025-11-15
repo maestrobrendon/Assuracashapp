@@ -10,16 +10,17 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Globe, Lock } from "lucide-react"
+import { CalendarIcon, Globe, Lock } from 'lucide-react'
 import { format } from "date-fns"
-import { createCircle } from "@/lib/actions/circles"
+import { supabase } from "@/lib/supabase"
 
 interface CreateCircleModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function CreateCircleModal({ open, onOpenChange }: CreateCircleModalProps) {
+export function CreateCircleModal({ open, onOpenChange, onSuccess }: CreateCircleModalProps) {
   const [circleName, setCircleName] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
@@ -38,28 +39,68 @@ export function CreateCircleModal({ open, onOpenChange }: CreateCircleModalProps
     setIsCreating(true)
 
     try {
-      const result = await createCircle({
-        circleName,
-        description,
-        category,
-        targetAmount: targetAmount ? Number.parseFloat(targetAmount) : undefined,
-        deadline,
-        isPublic,
-        allowExternal,
-        showMemberNames,
-        showContributions,
-        recurringAmount: recurringEnabled && recurringAmount ? Number.parseFloat(recurringAmount) : undefined,
-        recurringFrequency: recurringEnabled ? recurringFrequency : undefined,
-      })
-
-      if (result.error) {
-        console.error("[v0] Error:", result.error)
-        alert("Failed to create circle: " + result.error)
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        console.error("[v0] Not authenticated")
+        alert("Please log in to create a circle")
         setIsCreating(false)
         return
       }
 
-      console.log("[v0] Circle created successfully:", result.data)
+      console.log("[v0] Creating circle for user:", user.id)
+
+      const { data: circle, error: circleError } = await supabase
+        .from("circles")
+        .insert({
+          name: circleName,
+          description: description,
+          category: category,
+          target_amount: targetAmount ? Number.parseFloat(targetAmount) : null,
+          target_date: deadline ? deadline.toISOString() : null,
+          visibility: isPublic ? "public" : "private",
+          allow_external_contributions: allowExternal,
+          created_by: user.id,
+          purpose: description || circleName,
+          current_balance: 0,
+          member_count: 1,
+          recurring_amount: recurringEnabled && recurringAmount ? Number.parseFloat(recurringAmount) : null,
+          recurring_frequency: recurringEnabled ? recurringFrequency : null,
+        })
+        .select()
+        .single()
+
+      if (circleError) {
+        console.error("[v0] Error creating circle:", circleError)
+        alert("Failed to create circle: " + circleError.message)
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Circle created:", circle)
+
+      const { error: memberError } = await supabase
+        .from("circle_members")
+        .insert({
+          circle_id: circle.id,
+          user_id: user.id,
+          role: "admin",
+          total_contributed: 0,
+        })
+
+      if (memberError) {
+        console.error("[v0] Error adding circle admin:", memberError)
+        alert("Failed to add you as admin: " + memberError.message)
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Circle created successfully!")
+      
+      if (onSuccess) {
+        onSuccess()
+      }
+      
       onOpenChange(false)
     } catch (error) {
       console.error("[v0] Unexpected error:", error)

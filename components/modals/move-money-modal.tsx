@@ -166,6 +166,23 @@ export function MoveMoneyModal({ open, onOpenChange }: MoveMoneyModalProps) {
       return
     }
 
+    if (fromWallet.type === "budget") {
+      const { data: budgetWalletData } = await supabase
+        .from("budget_wallets")
+        .select("spend_limit")
+        .eq("id", fromWallet.id)
+        .single()
+
+      if (budgetWalletData?.spend_limit && transferAmount > budgetWalletData.spend_limit) {
+        toast({
+          title: "Spending Limit Exceeded",
+          description: `You cannot move more than ${formatNaira(budgetWalletData.spend_limit)} due to the spending limit set on this wallet.`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setIsLoading(true)
 
     try {

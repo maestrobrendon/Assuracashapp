@@ -1,24 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useParams } from "next/navigation"
-import {
-  ArrowLeft,
-  Users,
-  Calendar,
-  Settings,
-  Share2,
-  ArrowUpRight,
-  ArrowDownRight,
-  UserPlus,
-  Download,
-  Lock,
-  Globe,
-  Shield,
-  Crown,
-  MoreVertical,
-  MessageSquare,
-} from "lucide-react"
+import { useState, useEffect } from "react"
+import { useParams } from 'next/navigation'
+import { ArrowLeft, Users, Calendar, Settings, Share2, ArrowUpRight, ArrowDownRight, UserPlus, Download, Lock, Globe, Shield, Crown, MoreVertical, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -37,127 +21,85 @@ export default function CircleDetailPage() {
   const [withdrawModal, setWithdrawModal] = useState(false)
   const [inviteModal, setInviteModal] = useState(false)
   const [newPost, setNewPost] = useState("")
+  const [circle, setCircle] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Mock circle data
-  const circle = {
-    id: params.id,
-    name: "Family Vacation Fund",
-    description: "Saving together for December holiday in Dubai",
-    balance: 420000,
-    targetAmount: 1500000,
-    memberCount: 5,
-    role: "admin",
-    isPublic: false,
-    category: "Group Savings",
-    deadline: new Date("2025-12-01"),
-    createdAt: new Date("2024-06-15"),
-    privacySettings: {
-      showMemberNames: true,
-      showIndividualContributions: true,
-    },
-    allowExternalContributions: false,
-    inviteLink: "https://assuracash.app/invite/abc123xyz",
+  useEffect(() => {
+    loadCircleData()
+  }, [params.id])
+
+  const loadCircleData = async () => {
+    setIsLoading(true)
+    const { getCircleById } = await import("@/lib/actions/circles")
+    const result = await getCircleById(params.id as string)
+    
+    if (result.data) {
+      const formattedCircle = {
+        ...result.data,
+        balance: result.data.current_balance || 0,
+        targetAmount: result.data.target_amount || 0,
+        memberCount: result.data.member_count || 0,
+        isPublic: result.data.visibility === "public",
+        deadline: result.data.target_date ? new Date(result.data.target_date) : null,
+        createdAt: new Date(result.data.created_at),
+        privacySettings: {
+          showMemberNames: true,
+          showIndividualContributions: true,
+        },
+        allowExternalContributions: result.data.allow_external_contributions || false,
+        inviteLink: `https://assuracash.app/invite/${result.data.id}`,
+      }
+      setCircle(formattedCircle)
+    }
+    setIsLoading(false)
   }
 
-  const members = [
-    { id: "1", name: "You", username: "@adebayo", role: "admin", totalContributed: 120000, joinedAt: "Jun 2024" },
-    {
-      id: "2",
-      name: "Tunde Ogunleye",
-      username: "@tundeo",
-      role: "admin",
-      totalContributed: 100000,
-      joinedAt: "Jun 2024",
-    },
-    {
-      id: "3",
-      name: "Grace Idowu",
-      username: "@gracei",
-      role: "moderator",
-      totalContributed: 80000,
-      joinedAt: "Jul 2024",
-    },
-    {
-      id: "4",
-      name: "Kemi Johnson",
-      username: "@kemij",
-      role: "member",
-      totalContributed: 70000,
-      joinedAt: "Aug 2024",
-    },
-    { id: "5", name: "David Eze", username: "@davide", role: "member", totalContributed: 50000, joinedAt: "Sep 2024" },
-  ]
-
-  const transactions = [
-    {
-      id: "t1",
-      type: "contribution",
-      from: "Tunde Ogunleye",
-      amount: 50000,
-      timestamp: new Date("2025-01-15"),
-      note: "Monthly contribution",
-    },
-    {
-      id: "t2",
-      type: "contribution",
-      from: "You",
-      amount: 40000,
-      timestamp: new Date("2025-01-14"),
-    },
-    {
-      id: "t3",
-      type: "contribution",
-      from: "Grace Idowu",
-      amount: 30000,
-      timestamp: new Date("2025-01-13"),
-    },
-    {
-      id: "t4",
-      type: "withdrawal",
-      from: "Admin",
-      to: "Flight Booking",
-      amount: 150000,
-      timestamp: new Date("2025-01-10"),
-      note: "Booked Emirates flights for all 5 members",
-      receipt: true,
-    },
-    {
-      id: "t5",
-      type: "contribution",
-      from: "Kemi Johnson",
-      amount: 35000,
-      timestamp: new Date("2025-01-09"),
-    },
-  ]
-
-  const posts = [
-    {
-      id: "p1",
-      author: "Tunde Ogunleye",
-      role: "admin",
-      content: "Great news everyone! We just hit 30% of our target. Keep up the contributions!",
-      timestamp: new Date("2025-01-14"),
-      reactions: [
-        { emoji: "🎉", count: 4 },
-        { emoji: "❤️", count: 3 },
-      ],
-    },
-    {
-      id: "p2",
-      author: "Grace Idowu",
-      role: "moderator",
-      content: "I found some great hotel deals in Dubai. Sharing the link in our WhatsApp group!",
-      timestamp: new Date("2025-01-12"),
-      reactions: [{ emoji: "👍", count: 5 }],
-    },
-  ]
+  const handleContributeClose = (open: boolean) => {
+    setContributeModal(open)
+    if (!open) {
+      loadCircleData()
+    }
+  }
 
   const handlePostUpdate = () => {
     console.log("[v0] Posting update:", newPost)
     setNewPost("")
   }
 
-  const isAdminOrMod = circle.role === "admin" || circle.role === "moderator"
+  const isAdminOrMod = circle?.role === "admin" || circle?.role === "moderator"
+
+  if (isLoading || !circle) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading circle details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const members = circle.members?.map((m: any, idx: number) => ({
+    id: m.id,
+    name: m.user_id === circle.user_id ? "You" : `Member ${idx + 1}`,
+    username: `@member${idx + 1}`,
+    role: m.role,
+    totalContributed: m.total_contributed || 0,
+    joinedAt: new Date(m.joined_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+  })) || []
+
+  const transactions = circle.transactions?.map((tx: any) => ({
+    id: tx.id,
+    type: tx.type,
+    from: tx.user_id === circle.user_id ? "You" : "Member",
+    to: tx.description,
+    amount: tx.amount,
+    timestamp: new Date(tx.created_at),
+    note: tx.description,
+    receipt: false,
+  })) || []
+
+  const posts = [] // Placeholder for feed posts
 
   return (
     <div className="min-h-screen bg-background">
@@ -503,7 +445,6 @@ export default function CircleDetailPage() {
 
           {/* Feed Tab */}
           <TabsContent value="feed" className="space-y-6">
-            {/* Post Update */}
             {isAdminOrMod && (
               <Card>
                 <CardContent className="pt-6">
@@ -524,7 +465,6 @@ export default function CircleDetailPage() {
               </Card>
             )}
 
-            {/* Posts */}
             <div className="space-y-4">
               {posts.map((post) => (
                 <Card key={post.id}>
@@ -567,7 +507,7 @@ export default function CircleDetailPage() {
       </main>
 
       {/* Modals */}
-      <ContributeCircleModal open={contributeModal} onOpenChange={setContributeModal} circleName={circle.name} />
+      <ContributeCircleModal open={contributeModal} onOpenChange={handleContributeClose} circleName={circle.name} />
       <WithdrawCircleModal open={withdrawModal} onOpenChange={setWithdrawModal} circleBalance={circle.balance} />
       <InviteMembersModal
         open={inviteModal}

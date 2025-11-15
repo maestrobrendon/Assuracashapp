@@ -1,20 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  Users,
-  Plus,
-  TrendingUp,
-  Search,
-  Filter,
-  Globe,
-  Lock,
-  Target,
-  Calendar,
-  ArrowUpRight,
-  MoreVertical,
-  UserPlus,
-} from "lucide-react"
+import { Users, Plus, TrendingUp, Search, Filter, Globe, Lock, Target, Calendar, ArrowUpRight, MoreVertical, UserPlus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreateCircleModal } from "@/components/modals/create-circle-modal"
 import { ContributeCircleModal } from "@/components/modals/contribute-circle-modal"
 import Link from "next/link"
-import { getUserCircles, getPublicCircles } from "@/lib/actions/circles"
+import { supabase } from "@/lib/supabase"
 
 export default function CirclesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -39,21 +26,99 @@ export default function CirclesPage() {
 
   useEffect(() => {
     loadCircles()
+    
+    const circlesChannel = supabase
+      .channel('circles-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circles' }, () => {
+        console.log('[v0] Circles updated, reloading...')
+        loadCircles()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, () => {
+        console.log('[v0] Circle members updated, reloading...')
+        loadCircles()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(circlesChannel)
+    }
   }, [])
 
   const loadCircles = async () => {
     setIsLoading(true)
-    const [userResult, publicResult] = await Promise.all([getUserCircles(), getPublicCircles()])
+    console.log("[v0] Loading circles...")
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        console.error("[v0] Not authenticated")
+        setIsLoading(false)
+        return
+      }
 
-    if (userResult.data) {
-      setMyCircles(userResult.data)
+      console.log("[v0] Authenticated user:", user.id)
+
+      // Fetch user's circles through circle_members junction table
+      const { data: userCirclesData, error: userCirclesError } = await supabase
+        .from('circle_members')
+        .select(`
+          role,
+          total_contributed,
+          circles (*)
+        `)
+        .eq('user_id', user.id)
+
+      console.log("[v0] User circles data:", userCirclesData)
+      console.log("[v0] User circles error:", userCirclesError)
+
+      if (userCirclesError) {
+        console.error("[v0] Error fetching user circles:", userCirclesError)
+      } else if (userCirclesData) {
+        const formattedCircles = userCirclesData.map((item: any) => ({
+          ...item.circles,
+          role: item.role,
+          userContribution: item.total_contributed || 0,
+          memberCount: item.circles.member_count || 0,
+          balance: item.circles.current_balance || 0,
+          targetAmount: item.circles.target_amount || 0,
+          isPublic: item.circles.visibility === "public",
+          deadline: item.circles.target_date ? new Date(item.circles.target_date) : null,
+          recentActivity: [],
+        }))
+        console.log("[v0] Formatted my circles:", formattedCircles)
+        setMyCircles(formattedCircles)
+      }
+
+      // Fetch public circles
+      const { data: publicCirclesData, error: publicCirclesError } = await supabase
+        .from('circles')
+        .select('*')
+        .eq('visibility', 'public')
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      console.log("[v0] Public circles data:", publicCirclesData)
+      console.log("[v0] Public circles error:", publicCirclesError)
+
+      if (publicCirclesError) {
+        console.error("[v0] Error fetching public circles:", publicCirclesError)
+      } else if (publicCirclesData) {
+        const formattedPublic = publicCirclesData.map((circle: any) => ({
+          ...circle,
+          memberCount: circle.member_count || 0,
+          balance: circle.current_balance || 0,
+          targetAmount: circle.target_amount || 0,
+          isPublic: true,
+          organizer: "Admin",
+        }))
+        setPublicCircles(formattedPublic)
+      }
+    } catch (error) {
+      console.error("[v0] Unexpected error loading circles:", error)
+    } finally {
+      setIsLoading(false)
     }
-
-    if (publicResult.data) {
-      setPublicCircles(publicResult.data)
-    }
-
-    setIsLoading(false)
   }
 
   const handleCreateModalClose = (open: boolean) => {

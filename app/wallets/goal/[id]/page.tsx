@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -80,6 +81,94 @@ export default function GoalWalletDetailPage() {
 
   const progress = wallet ? (wallet.balance / wallet.target_amount) * 100 : 0
   const isLocked = wallet?.is_locked && wallet?.lock_until && new Date(wallet.lock_until) > new Date()
+
+  const handleAddFromMain = async () => {
+    if (!amount || Number.parseFloat(amount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (Number.parseFloat(amount) > mainWalletBalance) {
+      toast({
+        title: "Insufficient Balance",
+        description: "Insufficient balance in main wallet",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        toast({
+          title: "Not Authenticated",
+          description: "Please log in to continue",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const addAmount = Number.parseFloat(amount)
+
+      // Update goal wallet balance
+      const { error: goalError } = await supabase
+        .from('goal_wallets')
+        .update({ balance: wallet.balance + addAmount })
+        .eq('id', walletId)
+        .eq('user_id', user.id)
+
+      if (goalError) throw goalError
+
+      // Update main wallet balance
+      const { error: mainError } = await supabase
+        .from('main_wallets')
+        .update({ balance: mainWalletBalance - addAmount })
+        .eq('user_id', user.id)
+
+      if (mainError) throw mainError
+
+      // Record transaction
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        wallet_id: walletId,
+        amount: addAmount,
+        type: 'deposit',
+        description: `Added to ${wallet.name} from main wallet`,
+        status: 'completed',
+        reference_number: `GOAL${Date.now()}`
+      })
+
+      toast({
+        title: "Contribution Added",
+        description: `${formatNaira(addAmount)} added to your goal`,
+      })
+
+      setAmount('')
+      setAddModalOpen(false)
+      loadWalletData()
+      refetchMainWallet()
+    } catch (error: any) {
+      console.error('[v0] Error adding money:', error)
+      toast({
+        title: "Transaction Failed",
+        description: error.message || "Failed to add money to goal",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleWalletDeleted = () => {
+    router.push('/wallets')
+  }
 
   if (isLoading) {
     return (
@@ -268,11 +357,14 @@ export default function GoalWalletDetailPage() {
             id: wallet.id,
             name: wallet.name,
             type: "goal",
+            balance: wallet.balance,
             locked: wallet.locked,
             isLocked: wallet.is_locked,
+            lockUntil: wallet.lock_until,
             lockDurationDays: wallet.lock_duration_days,
           }}
           onUpdate={loadWalletData}
+          onDelete={handleWalletDeleted}
         />
       </main>
     </div>

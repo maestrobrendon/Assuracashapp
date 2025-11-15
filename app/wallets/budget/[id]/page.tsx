@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useMainWallet } from '@/lib/hooks/use-main-wallet'
+import { toast } from '@/components/ui/use-toast'
 import { ArrowLeft, ArrowRight, Lock, Unlock, Calendar, TrendingUp, TrendingDown, Plus, Settings } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -81,13 +82,41 @@ export default function BudgetWalletDetailPage() {
   const isLocked = wallet?.is_locked && wallet?.lock_until && new Date(wallet.lock_until) > new Date()
 
   const handleMoveToMain = async () => {
-    if (!amount || Number.parseFloat(amount) <= 0) {
-      alert('Please enter a valid amount')
+    if (isLocked) {
+      toast({
+        title: "Wallet Locked",
+        description: "This wallet is locked and cannot send money until the expiration date.",
+        variant: "destructive",
+      })
       return
     }
 
-    if (Number.parseFloat(amount) > wallet.balance) {
-      alert('Insufficient balance in budget wallet')
+    if (!amount || Number.parseFloat(amount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const moveAmount = Number.parseFloat(amount)
+
+    if (moveAmount > wallet.balance) {
+      toast({
+        title: "Insufficient Balance",
+        description: "Insufficient balance in budget wallet",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (wallet.spend_limit && moveAmount > wallet.spend_limit) {
+      toast({
+        title: "Spending Limit Exceeded",
+        description: `You cannot move more than ${formatNaira(wallet.spend_limit)} due to the spending limit set on this wallet.`,
+        variant: "destructive",
+      })
       return
     }
 
@@ -97,8 +126,6 @@ export default function BudgetWalletDetailPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) return
-
-      const moveAmount = Number.parseFloat(amount)
 
       const { error: budgetError } = await supabase
         .from('budget_wallets')
@@ -188,6 +215,10 @@ export default function BudgetWalletDetailPage() {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleWalletDeleted = () => {
+    router.push('/wallets')
   }
 
   if (isLoading) {
@@ -402,14 +433,17 @@ export default function BudgetWalletDetailPage() {
             id: wallet.id,
             name: wallet.name,
             type: "budget",
+            balance: wallet.balance,
             locked: wallet.locked,
             isLocked: wallet.is_locked,
+            lockUntil: wallet.lock_until,
             spendLimit: wallet.spend_limit,
             enableRollover: wallet.enable_rollover,
             customNotifications: wallet.custom_notifications,
             lockDurationDays: wallet.lock_duration_days,
           }}
           onUpdate={loadWalletData}
+          onDelete={handleWalletDeleted}
         />
       </main>
     </div>
