@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase"
 import { useMainWallet } from "@/lib/hooks/use-main-wallet"
 import { useAccountMode } from "@/lib/hooks/use-account-mode"
 import { useToast } from "@/hooks/use-toast"
+import { CreateVFDWalletModal } from "@/components/modals/create-vfd-wallet-modal"
 
 type UserSettings = {
   biometric_enabled: boolean
@@ -94,6 +95,7 @@ export default function ProfilePage() {
   
   const [isLoading, setIsLoading] = useState(true)
   const [showSwitchToLiveDialog, setShowSwitchToLiveDialog] = useState(false)
+  const [showCreateVFDWalletModal, setShowCreateVFDWalletModal] = useState(false)
 
   useEffect(() => {
     loadProfileData()
@@ -229,6 +231,20 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      if (newMode === 'live') {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('vfd_wallet_id, vfd_account_number')
+          .eq('user_id', user.id)
+          .single()
+
+        if (!profileData?.vfd_wallet_id || !profileData?.vfd_account_number) {
+          setShowSwitchToLiveDialog(false)
+          setShowCreateVFDWalletModal(true)
+          return
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ account_mode: newMode })
@@ -243,7 +259,6 @@ export default function ProfilePage() {
           : "Your practice data is still here!",
       })
 
-      // Refresh the page to reload all data with new mode
       setTimeout(() => {
         window.location.reload()
       }, 1000)
@@ -255,6 +270,11 @@ export default function ProfilePage() {
         variant: "destructive",
       })
     }
+  }
+
+  async function handleVFDWalletCreated() {
+    await handleSwitchMode('live')
+    setShowCreateVFDWalletModal(false)
   }
 
   async function handleLogout() {
@@ -628,6 +648,15 @@ export default function ProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {profile && (
+        <CreateVFDWalletModal
+          open={showCreateVFDWalletModal}
+          onOpenChange={setShowCreateVFDWalletModal}
+          profile={profile}
+          onSuccess={handleVFDWalletCreated}
+        />
+      )}
     </div>
   )
 }

@@ -34,11 +34,12 @@ export default function CirclesPage() {
     const circlesChannel = supabase
       .channel('circles-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'circles' }, () => {
-        console.log('[v0] Circles updated, reloading...')
         loadCircles()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, () => {
-        console.log('[v0] Circle members updated, reloading...')
+        loadCircles()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_transactions' }, () => {
         loadCircles()
       })
       .subscribe()
@@ -84,16 +85,25 @@ export default function CirclesPage() {
       if (userCirclesError) {
         console.error("[v0] Error fetching user circles:", userCirclesError)
       } else if (userCirclesData) {
-        const formattedCircles = userCirclesData.map((item: any) => ({
-          ...item.circles,
-          role: item.role,
-          userContribution: item.total_contributed || 0,
-          memberCount: item.circles.member_count || 0,
-          balance: item.circles.current_balance || 0,
-          targetAmount: item.circles.target_amount || 0,
-          isPublic: item.circles.visibility === "public",
-          deadline: item.circles.target_date ? new Date(item.circles.target_date) : null,
-          recentActivity: [],
+        const formattedCircles = await Promise.all(userCirclesData.map(async (item: any) => {
+          // Fetch actual members count for this circle
+          const { data: membersData } = await supabase
+            .from('circle_members')
+            .select('id')
+            .eq('circle_id', item.circles.id)
+            .eq('mode', accountMode)
+
+          return {
+            ...item.circles,
+            role: item.role,
+            userContribution: item.total_contributed || 0,
+            memberCount: membersData?.length || 0, // Use actual fetched count
+            balance: item.circles.current_balance || 0,
+            targetAmount: item.circles.target_amount || 0,
+            isPublic: item.circles.visibility === "public",
+            deadline: item.circles.target_date ? new Date(item.circles.target_date) : null,
+            recentActivity: [],
+          }
         }))
         console.log("[v0] Formatted my circles:", formattedCircles)
         setMyCircles(formattedCircles)
@@ -137,91 +147,99 @@ export default function CirclesPage() {
     }
   }
 
+  // Calculate accurate real-time stats from actual circle data
+  const totalPooled = myCircles.reduce((sum, circle) => sum + (circle.balance || 0), 0)
+  const totalUserContributed = myCircles.reduce((sum, circle) => sum + (circle.userContribution || 0), 0)
+  const adminCircles = myCircles.filter((c) => c.role === "admin").length
+  const avgProgress = myCircles.length > 0
+    ? myCircles.reduce((sum, c) => sum + ((c.balance || 0) / (c.targetAmount || 1)) * 100, 0) / myCircles.length
+    : 0
+
   return (
-    <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+    <div className="min-h-screen bg-background pb-20 md:pb-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {/* Responsive header with proper spacing for mobile */}
+        <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-foreground">Circles</h2>
-            <p className="mt-1 text-muted-foreground">Pool funds with groups toward shared goals</p>
+            <h2 className="text-2xl font-bold text-foreground sm:text-3xl">Circles</h2>
+            <p className="mt-1 text-sm text-muted-foreground sm:text-base">Pool funds with groups toward shared goals</p>
           </div>
-          <Button onClick={() => setCreateModalOpen(true)} size="lg">
+          <Button onClick={() => setCreateModalOpen(true)} size="lg" className="w-full sm:w-auto">
             <Plus className="mr-2 h-5 w-5" />
             Create Circle
           </Button>
         </div>
 
-        {/* Quick Stats */}
-        <div className="mb-8 grid gap-4 md:grid-cols-4">
+        {/* Updated stats with accurate real-time data */}
+        <div className="mb-6 grid gap-3 sm:mb-8 sm:gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 sm:pt-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Pooled</p>
-                  <p className="text-2xl font-bold text-foreground">₦2.52M</p>
-                </div>
-                <div className="rounded-full bg-primary/10 p-3">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">My Circles</p>
-                  <p className="text-2xl font-bold text-foreground">{myCircles.length}</p>
-                </div>
-                <div className="rounded-full bg-accent/10 p-3">
-                  <Users className="h-5 w-5 text-accent" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">As Admin</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {myCircles.filter((c) => c.role === "admin").length}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs text-muted-foreground sm:text-sm">Total Pooled</p>
+                  <p className="truncate text-lg font-bold text-foreground sm:text-2xl">
+                    ₦{totalPooled.toLocaleString('en-NG', { maximumFractionDigits: 0 })}
                   </p>
                 </div>
-                <div className="rounded-full bg-success/10 p-3">
-                  <Target className="h-5 w-5 text-success" />
+                <div className="ml-2 rounded-full bg-primary/10 p-2 sm:p-3">
+                  <TrendingUp className="h-4 w-4 text-primary sm:h-5 sm:w-5" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 sm:pt-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Goals Progress</p>
-                  <p className="text-2xl font-bold text-foreground">58%</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs text-muted-foreground sm:text-sm">My Circles</p>
+                  <p className="truncate text-lg font-bold text-foreground sm:text-2xl">{myCircles.length}</p>
                 </div>
-                <div className="rounded-full bg-info/10 p-3">
-                  <Calendar className="h-5 w-5 text-info" />
+                <div className="ml-2 rounded-full bg-accent/10 p-2 sm:p-3">
+                  <Users className="h-4 w-4 text-accent sm:h-5 sm:w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4 sm:pt-6">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs text-muted-foreground sm:text-sm">As Admin</p>
+                  <p className="truncate text-lg font-bold text-foreground sm:text-2xl">{adminCircles}</p>
+                </div>
+                <div className="ml-2 rounded-full bg-success/10 p-2 sm:p-3">
+                  <Target className="h-4 w-4 text-success sm:h-5 sm:w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4 sm:pt-6">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs text-muted-foreground sm:text-sm">Goals Progress</p>
+                  <p className="truncate text-lg font-bold text-foreground sm:text-2xl">{avgProgress.toFixed(0)}%</p>
+                </div>
+                <div className="ml-2 rounded-full bg-info/10 p-2 sm:p-3">
+                  <Calendar className="h-4 w-4 text-info sm:h-5 sm:w-5" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="my-circles" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="my-circles">My Circles</TabsTrigger>
-            <TabsTrigger value="explore">Explore Public</TabsTrigger>
+        {/* Responsive tabs for mobile */}
+        <Tabs defaultValue="my-circles" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="my-circles" className="text-xs sm:text-sm">My Circles</TabsTrigger>
+            <TabsTrigger value="explore" className="text-xs sm:text-sm">Explore Public</TabsTrigger>
           </TabsList>
 
           {/* My Circles Tab */}
-          <TabsContent value="my-circles" className="space-y-6">
+          <TabsContent value="my-circles" className="space-y-4 sm:space-y-6">
             {myCircles.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
@@ -241,19 +259,20 @@ export default function CirclesPage() {
             ) : (
               myCircles.map((circle) => (
                 <Card key={circle.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 pb-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-full bg-primary/10 p-4">
-                          <Users className="h-6 w-6 text-primary" />
+                  {/* Responsive card header */}
+                  <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 pb-3 sm:pb-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                        <div className="rounded-full bg-primary/10 p-3 sm:p-4 flex-shrink-0">
+                          <Users className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
                         </div>
-                        <div>
-                          <CardTitle className="text-xl mb-1">{circle.name}</CardTitle>
-                          <p className="text-sm text-muted-foreground mb-2">{circle.description}</p>
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="truncate text-base sm:text-xl mb-1">{circle.name}</CardTitle>
+                          <p className="line-clamp-2 text-xs text-muted-foreground sm:text-sm mb-2">{circle.description}</p>
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                             <Badge variant="secondary" className="text-xs">
                               <Users className="mr-1 h-3 w-3" />
-                              {circle.memberCount} members
+                              {circle.memberCount}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               {circle.isPublic ? (
@@ -271,32 +290,33 @@ export default function CirclesPage() {
                             <Badge variant="outline" className="text-xs capitalize bg-background">
                               {circle.role}
                             </Badge>
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="hidden sm:inline-flex text-xs">
                               {circle.category}
                             </Badge>
                           </div>
                         </div>
                       </div>
-                      <Link href={`/circles/${circle.id}`}>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-5 w-5" />
+                      <Link href={`/circles/${circle.id}`} className="flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10">
+                          <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
                       </Link>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="pt-6">
-                    <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Responsive card content and stacked on mobile */}
+                  <CardContent className="pt-4 sm:pt-6">
+                    <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
                       {/* Balance & Progress */}
-                      <div className="space-y-4">
+                      <div className="space-y-3 sm:space-y-4">
                         <div>
-                          <p className="text-sm text-muted-foreground mb-1">Current Balance</p>
-                          <p className="text-3xl font-bold text-foreground">₦{circle.balance.toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground sm:text-sm mb-1">Current Balance</p>
+                          <p className="text-2xl font-bold text-foreground sm:text-3xl">₦{circle.balance.toLocaleString()}</p>
                         </div>
 
                         {circle.targetAmount && (
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center justify-between text-xs sm:text-sm">
                               <span className="text-muted-foreground">Target Goal</span>
                               <span className="font-medium">
                                 ₦{circle.balance.toLocaleString()} / ₦{circle.targetAmount.toLocaleString()}
@@ -310,17 +330,19 @@ export default function CirclesPage() {
                         )}
 
                         {circle.deadline && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <Calendar className="h-3 w-3 text-muted-foreground sm:h-4 sm:w-4" />
                             <span className="text-muted-foreground">
                               Deadline: {circle.deadline.toLocaleDateString()}
                             </span>
                           </div>
                         )}
 
-                        <div className="flex gap-2 pt-2">
+                        {/* Buttons stack on mobile */}
+                        <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                           <Button
                             className="flex-1"
+                            size="sm"
                             onClick={() =>
                               setContributeModal({
                                 open: true,
@@ -333,29 +355,33 @@ export default function CirclesPage() {
                             Contribute
                           </Button>
                           <Link href={`/circles/${circle.id}`} className="flex-1">
-                            <Button variant="outline" className="w-full bg-transparent">
+                            <Button variant="outline" size="sm" className="w-full bg-transparent">
                               View Details
                             </Button>
                           </Link>
                         </div>
                       </div>
 
-                      {/* Recent Activity */}
-                      <div>
-                        <h4 className="mb-3 font-semibold text-foreground">Recent Activity</h4>
+                      {/* Recent Activity - hidden on small mobile */}
+                      <div className="hidden sm:block">
+                        <h4 className="mb-3 text-sm font-semibold text-foreground sm:text-base">Recent Activity</h4>
                         <div className="space-y-2">
-                          {circle.recentActivity.map((activity, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3"
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-foreground">{activity.member} contributed</p>
-                                <p className="text-xs text-muted-foreground">{activity.time}</p>
+                          {circle.recentActivity.length > 0 ? (
+                            circle.recentActivity.map((activity, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-2 sm:p-3"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-xs font-medium text-foreground sm:text-sm">{activity.member} contributed</p>
+                                  <p className="text-xs text-muted-foreground">{activity.time}</p>
+                                </div>
+                                <p className="ml-2 flex-shrink-0 text-xs font-semibold text-success sm:text-sm">+₦{activity.amount.toLocaleString()}</p>
                               </div>
-                              <p className="text-sm font-semibold text-success">+₦{activity.amount.toLocaleString()}</p>
-                            </div>
-                          ))}
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground sm:text-sm">No recent activity</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -366,8 +392,9 @@ export default function CirclesPage() {
           </TabsContent>
 
           {/* Explore Tab */}
-          <TabsContent value="explore" className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4">
+          <TabsContent value="explore" className="space-y-4 sm:space-y-6">
+            {/* Responsive search and filter */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -377,16 +404,17 @@ export default function CirclesPage() {
                   className="pl-10"
                 />
               </div>
-              <Button variant="outline">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <Filter className="mr-2 h-4 w-4" />
                 Filter
               </Button>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Responsive grid for all screen sizes */}
+            <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {publicCircles.map((circle) => (
                 <Card key={circle.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <CardHeader className="bg-gradient-to-br from-primary/10 to-accent/10">
+                  <CardHeader className="bg-gradient-to-br from-primary/10 to-accent/10 pb-3">
                     <div className="flex items-start justify-between mb-2">
                       <Badge variant="secondary" className="text-xs">
                         <Globe className="mr-1 h-3 w-3" />
@@ -396,14 +424,14 @@ export default function CirclesPage() {
                         {circle.category}
                       </Badge>
                     </div>
-                    <CardTitle className="text-lg leading-tight">{circle.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">{circle.description}</p>
+                    <CardTitle className="line-clamp-2 text-base leading-tight sm:text-lg">{circle.name}</CardTitle>
+                    <p className="line-clamp-2 text-xs text-muted-foreground sm:text-sm mt-1">{circle.description}</p>
                   </CardHeader>
 
                   <CardContent className="pt-4">
                     <div className="space-y-4">
                       <div>
-                        <div className="flex items-center justify-between text-sm mb-2">
+                        <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
                           <span className="text-muted-foreground">Progress</span>
                           <span className="font-medium">
                             ₦{circle.balance.toLocaleString()} / ₦{circle.targetAmount.toLocaleString()}
@@ -412,15 +440,15 @@ export default function CirclesPage() {
                         <Progress value={(circle.balance / circle.targetAmount) * 100} className="h-2" />
                       </div>
 
-                      <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
                         <div className="flex items-center gap-1 text-muted-foreground">
-                          <Users className="h-4 w-4" />
+                          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                           <span>{circle.memberCount} members</span>
                         </div>
                         <span className="text-xs text-muted-foreground">by {circle.organizer}</span>
                       </div>
 
-                      <Button className="w-full bg-transparent" variant="outline">
+                      <Button className="w-full bg-transparent" size="sm" variant="outline">
                         <UserPlus className="mr-2 h-4 w-4" />
                         Join Circle
                       </Button>
