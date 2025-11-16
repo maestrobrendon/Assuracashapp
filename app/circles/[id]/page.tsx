@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, Settings, Share2, ArrowUpRight, ArrowDownRight, UserPlus, Download, Lock, Globe, Shield, Crown, MoreVertical, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,44 +14,114 @@ import { ContributeCircleModal } from "@/components/modals/contribute-circle-mod
 import { WithdrawCircleModal } from "@/components/modals/withdraw-circle-modal"
 import { InviteMembersModal } from "@/components/modals/invite-members-modal"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 export default function CircleDetailPage() {
   const params = useParams()
+  const router = useRouter()
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
   const [contributeModal, setContributeModal] = useState(false)
   const [withdrawModal, setWithdrawModal] = useState(false)
   const [inviteModal, setInviteModal] = useState(false)
   const [newPost, setNewPost] = useState("")
   const [circle, setCircle] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadCircleData()
-  }, [params.id])
+    if (!accountModeLoading && accountMode) {
+      loadCircleData()
+    }
+  }, [params.id, accountMode, accountModeLoading])
 
   const loadCircleData = async () => {
+    console.log("[v0] Loading circle data for ID:", params.id, "Mode:", accountMode)
     setIsLoading(true)
-    const { getCircleById } = await import("@/lib/actions/circles")
-    const result = await getCircleById(params.id as string)
+    setError(null)
     
-    if (result.data) {
+    try {
+      const supabase = createClient()
+      
+      // Get authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !user) {
+        console.error("[v0] Authentication error:", authError)
+        setError("Not authenticated")
+        router.push("/auth/login")
+        return
+      }
+
+      console.log("[v0] Authenticated user:", user.id)
+
+      // Fetch circle with mode filter
+      const { data: circleData, error: circleError } = await supabase
+        .from("circles")
+        .select(`
+          *,
+          circle_members!inner(
+            id,
+            role,
+            total_contributed,
+            joined_at,
+            user_id
+          )
+        `)
+        .eq("id", params.id)
+        .eq("mode", accountMode)
+        .single()
+
+      if (circleError) {
+        console.error("[v0] Error fetching circle:", circleError)
+        setError("Circle not found")
+        return
+      }
+
+      console.log("[v0] Circle data loaded:", circleData)
+
+      // Get user's role in this circle
+      const userMembership = circleData.circle_members.find((m: any) => m.user_id === user.id)
+      const userRole = userMembership?.role || "member"
+
+      // Fetch transactions for this circle
+      const { data: transactionsData } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("circle_id", params.id)
+        .eq("mode", accountMode)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      // Format circle data
       const formattedCircle = {
-        ...result.data,
-        balance: result.data.current_balance || 0,
-        targetAmount: result.data.target_amount || 0,
-        memberCount: result.data.member_count || 0,
-        isPublic: result.data.visibility === "public",
-        deadline: result.data.target_date ? new Date(result.data.target_date) : null,
-        createdAt: new Date(result.data.created_at),
+        ...circleData,
+        balance: circleData.current_balance || 0,
+        targetAmount: circleData.target_amount || 0,
+        memberCount: circleData.member_count || 0,
+        isPublic: circleData.visibility === "public",
+        deadline: circleData.target_date ? new Date(circleData.target_date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(circleData.created_at),
+        role: userRole,
+        members: circleData.circle_members,
+        transactions: transactionsData || [],
         privacySettings: {
           showMemberNames: true,
           showIndividualContributions: true,
         },
-        allowExternalContributions: result.data.allow_external_contributions || false,
-        inviteLink: `https://assuracash.app/invite/${result.data.id}`,
+        allowExternalContributions: circleData.allow_external_contributions || false,
+        inviteLink: `https://assuracash.app/invite/${circleData.id}`,
+        user_id: user.id,
       }
+
+      console.log("[v0] Formatted circle:", formattedCircle)
       setCircle(formattedCircle)
+    } catch (error) {
+      console.error("[v0] Error loading circle:", error)
+      setError("Failed to load circle")
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   const handleContributeClose = (open: boolean) => {
@@ -68,12 +138,25 @@ export default function CircleDetailPage() {
 
   const isAdminOrMod = circle?.role === "admin" || circle?.role === "moderator"
 
-  if (isLoading || !circle) {
+  if (accountModeLoading || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
           <p className="text-muted-foreground">Loading circle details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !circle) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">{error || "Circle not found"}</p>
+          <Link href="/circles">
+            <Button>Back to Circles</Button>
+          </Link>
         </div>
       </div>
     )

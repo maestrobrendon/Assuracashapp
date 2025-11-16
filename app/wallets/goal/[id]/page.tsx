@@ -27,7 +27,7 @@ export default function GoalWalletDetailPage() {
   const walletId = params.id as string
 
   const { balance: mainWalletBalance, refetch: refetchMainWallet } = useMainWallet()
-  const accountMode = useAccountMode()
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
 
   const [wallet, setWallet] = useState<any>(null)
   const [transactions, setTransactions] = useState<any[]>([])
@@ -38,7 +38,7 @@ export default function GoalWalletDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const loadWalletData = async () => {
-    if (!accountMode) return
+    if (accountModeLoading || !accountMode) return
     
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -64,8 +64,10 @@ export default function GoalWalletDetailPage() {
   }
 
   useEffect(() => {
-    if (walletId) loadWalletData()
-  }, [walletId])
+    if (walletId && !accountModeLoading && accountMode) {
+      loadWalletData()
+    }
+  }, [walletId, accountMode, accountModeLoading])
 
   useEffect(() => {
     const channel = supabase
@@ -175,7 +177,7 @@ export default function GoalWalletDetailPage() {
     router.push('/wallets')
   }
 
-  if (isLoading) {
+  if (accountModeLoading || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">

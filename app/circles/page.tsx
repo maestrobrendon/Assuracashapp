@@ -24,10 +24,12 @@ export default function CirclesPage() {
   const [myCircles, setMyCircles] = useState<any[]>([])
   const [publicCircles, setPublicCircles] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const accountMode = useAccountMode()
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
 
   useEffect(() => {
-    loadCircles()
+    if (!accountModeLoading && accountMode) {
+      loadCircles()
+    }
     
     const circlesChannel = supabase
       .channel('circles-changes')
@@ -44,13 +46,13 @@ export default function CirclesPage() {
     return () => {
       supabase.removeChannel(circlesChannel)
     }
-  }, [])
+  }, [accountMode, accountModeLoading])
 
   const loadCircles = async () => {
     setIsLoading(true)
     console.log("[v0] Loading circles...")
     
-    if (!accountMode) {
+    if (accountModeLoading || !accountMode) {
       setIsLoading(false)
       return
     }
