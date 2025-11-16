@@ -45,7 +45,7 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          emailRedirectTo: undefined, // Skip email verification
+          emailRedirectTo: undefined,
           data: {
             full_name: fullName,
           },
@@ -53,7 +53,6 @@ export default function SignUpPage() {
       })
       if (error) throw error
       
-      // Redirect directly to dashboard
       window.location.href = '/dashboard'
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
@@ -74,7 +73,7 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        <Card className="border-0 shadow-xl shadow-gray-200/50 rounded-[24px] overflow-hidden">
+        <Card className="border border-gray-200/80 shadow-sm bg-white/80 backdrop-blur-xl rounded-3xl overflow-hidden">
           <CardHeader className="space-y-2 pb-6 pt-8 px-6 sm:px-8">
             <CardTitle className="text-2xl font-semibold text-gray-900 sm:text-3xl">Get Started</CardTitle>
             <CardDescription className="text-sm text-gray-600 sm:text-base">
@@ -85,7 +84,7 @@ export default function SignUpPage() {
             <form onSubmit={handleSignUp}>
               <div className="flex flex-col gap-5">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="fullName" className="text-sm font-medium text-gray-900">
                     Full Name
                   </Label>
                   <Input
@@ -95,12 +94,12 @@ export default function SignUpPage() {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    className="h-12 rounded-xl border-gray-300 bg-white px-4 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="email" className="text-sm font-medium text-gray-900">
                     Email
                   </Label>
                   <Input
@@ -110,12 +109,12 @@ export default function SignUpPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    className="h-12 rounded-xl border-gray-300 bg-white px-4 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="password" className="text-sm font-medium text-gray-900">
                     Password
                   </Label>
                   <div className="relative">
@@ -126,7 +125,7 @@ export default function SignUpPage() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 pr-12 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                      className="h-12 rounded-xl border-gray-300 bg-white px-4 pr-12 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                     />
                     <button
                       type="button"
@@ -141,7 +140,7 @@ export default function SignUpPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-900">
                     Confirm Password
                   </Label>
                   <div className="relative">
@@ -152,7 +151,7 @@ export default function SignUpPage() {
                       required
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 pr-12 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                      className="h-12 rounded-xl border-gray-300 bg-white px-4 pr-12 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                     />
                     <button
                       type="button"

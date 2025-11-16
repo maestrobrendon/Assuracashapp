@@ -504,7 +504,7 @@ export default function HomePage() {
                         className="absolute right-2 top-2 h-8 w-8 rounded-full z-10"
                         onClick={() => handleDismissRequest(request.id)}
                       >
-                        
+                        <X className="h-4 w-4" />
                       </Button>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -727,32 +727,15 @@ export default function HomePage() {
                         <div className="mb-4 flex items-start justify-between">
                           <div>
                             <h3 className="text-lg font-semibold text-foreground">{circle.name}</h3>
-                            <p className="text-sm text-muted-foreground">{circle.description}</p>
+                            <p className="text-sm text-muted-foreground">{circle.members} members</p>
                           </div>
                           <Badge variant="secondary" className="bg-primary/10 text-primary">
                             <Users className="mr-1 h-3 w-3" />
-                            {circle.memberCount}
+                            {circle.members}
                           </Badge>
                         </div>
 
                         <p className="mb-4 text-3xl font-bold text-foreground">{formatBalanceShort(circle.balance)}</p>
-
-                        {circle.targetAmount && (
-                          <>
-                            <div className="mb-3">
-                              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-primary via-primary to-primary/80 transition-all duration-500"
-                                  style={{ width: `${Math.min((circle.balance / circle.targetAmount) * 100, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between text-sm text-muted-foreground">
-                              <span>{formatBalanceShort(circle.balance)}</span>
-                              <span>{formatBalanceShort(circle.targetAmount)}</span>
-                            </div>
-                          </>
-                        )}
                       </CardContent>
                     </Card>
                   ))}

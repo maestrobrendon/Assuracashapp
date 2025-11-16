@@ -90,7 +90,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Login Form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 bg-gray-50">
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 bg-gradient-to-b from-gray-50 to-white">
         <div className="w-full max-w-md space-y-8">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center justify-center gap-3 pb-8">
@@ -105,24 +105,24 @@ export default function LoginPage() {
             <p className="text-gray-600">Sign in to access your account</p>
           </div>
 
-          <Card className="border border-gray-200 shadow-sm">
+          <Card className="border border-gray-200/80 shadow-sm bg-white/80 backdrop-blur-xl rounded-3xl overflow-hidden">
             <CardContent className="pt-6">
               <Tabs 
                 value={loginMethod} 
                 onValueChange={(v) => setLoginMethod(v as "phone" | "email")} 
                 className="mb-6"
               >
-                <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+                <TabsList className="grid w-full grid-cols-2 bg-gray-100/80">
                   <TabsTrigger 
                     value="email"
-                    className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm"
+                    className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm rounded-lg"
                   >
                     <Mail className="h-4 w-4 mr-2" />
                     Email
                   </TabsTrigger>
                   <TabsTrigger 
                     value="phone"
-                    className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm"
+                    className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm rounded-lg"
                   >
                     <Phone className="h-4 w-4 mr-2" />
                     Phone
@@ -133,9 +133,9 @@ export default function LoginPage() {
               <form onSubmit={handleLogin} className="space-y-5">
                 {loginMethod === "phone" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-gray-700 font-medium">Phone Number</Label>
+                    <Label htmlFor="phone" className="text-gray-900 font-medium">Phone Number</Label>
                     <div className="flex gap-2">
-                      <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2">
+                      <div className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2">
                         <span className="text-xl">🇳🇬</span>
                         <span className="text-sm text-gray-600 font-medium">+234</span>
                       </div>
@@ -145,14 +145,14 @@ export default function LoginPage() {
                         placeholder="801 234 5678"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="flex-1 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                        className="flex-1 h-12 rounded-xl border-gray-300 bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                         required
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-gray-700 font-medium">Email Address</Label>
+                    <Label htmlFor="email" className="text-gray-900 font-medium">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                       <Input
@@ -161,7 +161,7 @@ export default function LoginPage() {
                         placeholder="you@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                        className="pl-10 h-12 rounded-xl border-gray-300 bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                         required
                       />
                     </div>
@@ -169,7 +169,7 @@ export default function LoginPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-700 font-medium">Password</Label>
+                  <Label htmlFor="password" className="text-gray-900 font-medium">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                     <Input
@@ -178,7 +178,7 @@ export default function LoginPage() {
                       placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                      className="pl-10 pr-10 h-12 rounded-xl border-gray-300 bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                       required
                     />
                     <button
@@ -193,14 +193,14 @@ export default function LoginPage() {
                 </div>
 
                 {error && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+                  <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-600">
                     {error}
                   </div>
                 )}
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold h-11" 
+                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold h-12 rounded-xl shadow-lg shadow-orange-500/30" 
                   size="lg" 
                   disabled={isLoading}
                 >
@@ -231,7 +231,7 @@ export default function LoginPage() {
             <Button 
               variant="outline" 
               size="lg" 
-              className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 font-semibold h-11" 
+              className="w-full border-2 border-orange-500 text-orange-600 hover:bg-orange-50 font-semibold h-12 rounded-xl" 
               asChild
             >
               <Link href="/auth/sign-up">
