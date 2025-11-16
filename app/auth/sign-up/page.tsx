@@ -34,47 +34,60 @@ export default function SignUpPage() {
       return
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters")
+      setIsLoading(false)
+      return
+    }
+
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+          emailRedirectTo: undefined, // Skip email verification
           data: {
             full_name: fullName,
           },
         },
       })
       if (error) throw error
-      router.push("/auth/sign-up-success")
+      
+      // Redirect directly to dashboard
+      window.location.href = '/dashboard'
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
-    } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4 sm:p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-2 sm:mb-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary sm:h-16 sm:w-16">
-            <Wallet className="h-7 w-7 text-primary-foreground sm:h-8 sm:w-8" />
+    <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-b from-gray-50 to-white p-4 sm:p-6">
+      <div className="w-full max-w-md">
+        <div className="mb-8 flex flex-col items-center gap-3 sm:mb-10">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/30 sm:h-20 sm:w-20">
+            <Wallet className="h-8 w-8 text-white sm:h-10 sm:w-10" />
           </div>
-          <h1 className="text-xl font-bold sm:text-2xl">Assura Cash</h1>
-          <p className="text-xs text-muted-foreground sm:text-sm">Create your account</p>
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-gray-900 sm:text-3xl">Assura Cash</h1>
+            <p className="mt-1 text-sm text-gray-600 sm:text-base">Create your account</p>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl sm:text-2xl">Sign Up</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Start managing your money smarter</CardDescription>
+        <Card className="border-0 shadow-xl shadow-gray-200/50 rounded-[24px] overflow-hidden">
+          <CardHeader className="space-y-2 pb-6 pt-8 px-6 sm:px-8">
+            <CardTitle className="text-2xl font-semibold text-gray-900 sm:text-3xl">Get Started</CardTitle>
+            <CardDescription className="text-sm text-gray-600 sm:text-base">
+              Start with ₦500,000 demo money
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-6 pb-8 sm:px-8">
             <form onSubmit={handleSignUp}>
-              <div className="flex flex-col gap-4 sm:gap-6">
-                <div className="grid gap-2">
-                  <Label htmlFor="fullName" className="text-sm">Full Name</Label>
+              <div className="flex flex-col gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
+                    Full Name
+                  </Label>
                   <Input
                     id="fullName"
                     type="text"
@@ -82,11 +95,14 @@ export default function SignUpPage() {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="h-11"
+                    className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email" className="text-sm">Email</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -94,65 +110,112 @@ export default function SignUpPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-11"
+                    className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password" className="text-sm">Password</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                    Password
+                  </Label>
                   <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
+                      placeholder="Create a strong password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-11 pr-10"
+                      className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 pr-12 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">At least 6 characters</p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="confirmPassword" className="text-sm">Confirm Password</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                    Confirm Password
+                  </Label>
                   <div className="relative">
                     <Input
                       id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Re-enter your password"
                       required
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="h-11 pr-10"
+                      className="h-12 rounded-xl border-gray-200 bg-gray-50 px-4 pr-12 text-base transition-all focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                     >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
-                {error && <div className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive sm:text-sm">{error}</div>}
-                <Button type="submit" className="w-full h-11" disabled={isLoading}>
-                  {isLoading ? "Creating account..." : "Sign Up"}
+
+                {error && (
+                  <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-600">
+                    {error}
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 mt-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold text-base shadow-lg shadow-orange-500/30 transition-all" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Creating account...
+                    </span>
+                  ) : (
+                    "Create Account"
+                  )}
                 </Button>
-              </div>
-              <div className="mt-4 text-center text-xs sm:text-sm">
-                Already have an account?{" "}
-                <Link href="/auth/login" className="font-medium text-primary underline-offset-4 hover:underline">
-                  Login
-                </Link>
+
+                <p className="text-xs text-gray-500 text-center leading-relaxed pt-2">
+                  By signing up, you agree to our{' '}
+                  <Link href="/terms" className="text-orange-600 hover:text-orange-700 font-medium">
+                    Terms
+                  </Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" className="text-orange-600 hover:text-orange-700 font-medium">
+                    Privacy Policy
+                  </Link>
+                </p>
               </div>
             </form>
           </CardContent>
         </Card>
+
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link 
+              href="/auth/login" 
+              className="font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+            >
+              Sign In
+            </Link>
+          </p>
+        </div>
+
+        <p className="mt-8 text-center text-xs text-gray-400">
+          Making <span className="font-semibold text-gray-600">Budgeting</span> sexy since 2025
+        </p>
       </div>
     </div>
   )

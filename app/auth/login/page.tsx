@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Wallet, Lock, Eye, EyeOff } from 'lucide-react'
+import { Wallet, Lock, Eye, EyeOff, Mail, Phone } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function LoginPage() {
@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [loginMethod, setLoginMethod] = useState<"phone" | "email">("phone")
+  const [loginMethod, setLoginMethod] = useState<"phone" | "email">("email")
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
@@ -29,7 +29,6 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      // For phone login, we'll use email/password for now as Supabase phone auth requires additional setup
       const { error: signInError, data } = await supabase.auth.signInWithPassword({
         email: loginMethod === "email" ? email : `${phoneNumber}@assura.app`,
         password,
@@ -38,138 +37,216 @@ export default function LoginPage() {
       if (signInError) throw signInError
 
       console.log("[v0] Login successful, user ID:", data.user?.id)
-      console.log("[v0] Session:", data.session)
 
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      // Verify session is established
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      console.log("[v0] Verified session after login:", session?.user?.id)
-
-      // Check if profile exists
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user?.id).single()
-
-      if (!profile) {
-        router.push("/auth/setup-profile")
-      } else {
-        router.push("/")
-      }
-      router.refresh()
+      // SUCCESS - Redirect to dashboard
+      window.location.href = '/dashboard'
+      
     } catch (error: unknown) {
       console.error("[v0] Login error:", error)
       setError(error instanceof Error ? error.message : "Login failed")
-    } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 p-6">
-      <div className="w-full max-w-md">
-        <Card className="border-none shadow-2xl">
-          <CardHeader className="space-y-4 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600">
-              <Wallet className="h-8 w-8 text-white" />
+    <div className="flex min-h-screen w-full">
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-12 flex-col justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+            <Wallet className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-2xl font-bold text-white">Assura Cash</span>
+        </div>
+        
+        <div className="space-y-6">
+          <h1 className="text-5xl font-bold text-white leading-tight">
+            Africa's First<br />
+            Spending Operating<br />
+            System
+          </h1>
+          <p className="text-xl text-orange-100 max-w-md">
+            Take control of your finances with intelligent budgeting, goal tracking, and group savings.
+          </p>
+          <div className="flex gap-4 pt-4">
+            <div className="flex items-center gap-2 text-white">
+              <div className="h-2 w-2 rounded-full bg-white"></div>
+              <span className="text-sm">Demo Mode</span>
             </div>
-            <div>
-              <CardTitle className="text-2xl">Log In to Assura Cash</CardTitle>
-              <CardDescription>Access your account securely</CardDescription>
+            <div className="flex items-center gap-2 text-white">
+              <div className="h-2 w-2 rounded-full bg-white"></div>
+              <span className="text-sm">Live Transactions</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={loginMethod} onValueChange={(v) => setLoginMethod(v as "phone" | "email")} className="mb-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="phone">Phone Number</TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginMethod === "phone" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <div className="flex gap-2">
-                    <div className="flex items-center gap-2 rounded-lg border bg-muted px-3">
-                      <span className="text-2xl">🇳🇬</span>
-                      <span className="text-sm">+234</span>
-                    </div>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="Phone Number"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="flex-1"
-                      required
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
-
-              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Next"}
-              </Button>
-
-              <div className="space-y-2 text-center text-sm">
-                <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
-                  Lost your phone? Lock your Account 🔒
-                </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="mt-6 text-center">
-          <Button variant="outline" size="lg" className="w-full bg-blue-700/20 text-white hover:bg-blue-700/30" asChild>
-            <Link href="/auth/signup">
-              New to Assura Cash? <span className="ml-1 font-semibold">Sign Up</span>
-            </Link>
-          </Button>
+            <div className="flex items-center gap-2 text-white">
+              <div className="h-2 w-2 rounded-full bg-white"></div>
+              <span className="text-sm">Virtual Accounts</span>
+            </div>
+          </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-white/60">
-          Making <span className="font-semibold">Budgeting</span> sexy <span className="font-semibold">2025 </span>.
+        <p className="text-sm text-orange-100">
+          Making <span className="font-semibold">Budgeting</span> sexy since 2025
         </p>
+      </div>
+
+      {/* Right side - Login Form */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 bg-gray-50">
+        <div className="w-full max-w-md space-y-8">
+          {/* Mobile logo */}
+          <div className="flex lg:hidden items-center justify-center gap-3 pb-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500">
+              <Wallet className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-gray-900">Assura Cash</span>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-gray-900">Welcome back</h2>
+            <p className="text-gray-600">Sign in to access your account</p>
+          </div>
+
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="pt-6">
+              <Tabs 
+                value={loginMethod} 
+                onValueChange={(v) => setLoginMethod(v as "phone" | "email")} 
+                className="mb-6"
+              >
+                <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+                  <TabsTrigger 
+                    value="email"
+                    className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Email
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="phone"
+                    className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm"
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    Phone
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <form onSubmit={handleLogin} className="space-y-5">
+                {loginMethod === "phone" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-gray-700 font-medium">Phone Number</Label>
+                    <div className="flex gap-2">
+                      <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2">
+                        <span className="text-xl">🇳🇬</span>
+                        <span className="text-sm text-gray-600 font-medium">+234</span>
+                      </div>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="801 234 5678"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="flex-1 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-gray-700 font-medium">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-gray-700 font-medium">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+                    {error}
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold h-11" 
+                  size="lg" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Signing in...
+                    </span>
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+
+                <div className="text-center">
+                  <Link 
+                    href="/auth/forgot-password" 
+                    className="text-sm text-orange-600 hover:text-orange-700 font-medium hover:underline"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="text-center">
+            <p className="text-gray-600 text-sm mb-3">Don't have an account?</p>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 font-semibold h-11" 
+              asChild
+            >
+              <Link href="/auth/sign-up">
+                Create Free Account
+              </Link>
+            </Button>
+          </div>
+
+          <p className="text-center text-xs text-gray-500 pt-4">
+            By signing in, you agree to our{' '}
+            <Link href="/terms" className="text-orange-600 hover:underline">Terms of Service</Link>
+            {' '}and{' '}
+            <Link href="/privacy" className="text-orange-600 hover:underline">Privacy Policy</Link>
+          </p>
+        </div>
       </div>
     </div>
   )
