@@ -14,6 +14,7 @@ import { TopUpModal } from "@/components/modals/top-up-modal"
 import { WithdrawModal } from "@/components/modals/withdraw-modal"
 import { BudgetWalletModal } from "@/components/modals/budget-wallet-modal"
 import { GoalWalletModal } from "@/components/modals/goal-wallet-modal"
+import { CreateCircleModal } from "@/components/modals/create-circle-modal"
 import { WalletCard } from "@/components/wallet-card"
 import { mockCircles, mockFavoriteContacts, mockPendingRequests } from "@/lib/mock-data"
 import { getBudgetWallets, getGoalWallets } from "@/lib/actions/wallets"
@@ -32,6 +33,7 @@ export default function HomePage() {
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
   const [goalModalOpen, setGoalModalOpen] = useState(false)
+  const [createCircleModalOpen, setCreateCircleModalOpen] = useState(false)
   const [walletType, setWalletType] = useState<"budget" | "goal">("budget")
   const [activeWalletTab, setActiveWalletTab] = useState<"budget" | "goals" | "circles">("budget")
   const [dismissedRequests, setDismissedRequests] = useState<string[]>([])
@@ -42,17 +44,13 @@ export default function HomePage() {
   const [goalWallets, setGoalWallets] = useState<any[]>([])
   const [isLoadingWallets, setIsLoadingWallets] = useState(true)
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+  const [circles, setCircles] = useState<any[]>(mockCircles)
   const [quickStats, setQuickStats] = useState({
     budgetTotal: 0,
     goalTotal: 0,
     circlesTotal: 0,
     transactionCount: 0,
   })
-
-  const circles = [
-    { id: 1, name: "Team Fund", members: 5, balance: 234500 },
-    { id: 2, name: "Project Alpha", members: 3, balance: 89200 },
-  ]
 
   const activePendingRequests = mockPendingRequests.filter((req) => !dismissedRequests.includes(req.id))
 
@@ -119,6 +117,13 @@ export default function HomePage() {
     if (!open) {
       refetchMainWallet()
       loadTransactions()
+      calculateQuickStats()
+    }
+  }
+
+  const handleCreateCircleModalClose = (open: boolean) => {
+    setCreateCircleModalOpen(open)
+    if (!open) {
       calculateQuickStats()
     }
   }
@@ -389,17 +394,6 @@ export default function HomePage() {
 
                 <div className="mt-4 grid grid-cols-4 gap-3">
                   <Button
-                    onClick={() => setSendModalOpen(true)}
-                    variant="ghost"
-                    className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
-                  >
-                    <div className="rounded-full bg-primary/10 p-2.5">
-                      <Send className="h-4 w-4 text-primary" />
-                    </div>
-                    <span className="text-xs text-muted-foreground">Transfer</span>
-                  </Button>
-
-                  <Button
                     onClick={() => setTopUpModalOpen(true)}
                     variant="ghost"
                     className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
@@ -433,6 +427,17 @@ export default function HomePage() {
                       <ArrowUpRight className="h-4 w-4 text-primary" />
                     </div>
                     <span className="text-xs text-muted-foreground">Withdraw</span>
+                  </Button>
+
+                  <Button
+                    onClick={() => setRequestModalOpen(true)}
+                    variant="ghost"
+                    className="flex h-auto flex-col items-center gap-2 rounded-xl py-3"
+                  >
+                    <div className="rounded-full bg-primary/10 p-2.5">
+                      <ArrowDownLeft className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Request</span>
                   </Button>
                 </div>
               </CardContent>
@@ -726,11 +731,11 @@ export default function HomePage() {
               {/* Circles */}
               {activeWalletTab === "circles" && (
                 <div className="space-y-4">
-                  {circles.map((circle) => (
+                  {circles.filter((circle) => circle.role === "admin").map((circle) => (
                     <Card
                       key={circle.id}
                       className="group cursor-pointer overflow-hidden border-border/50 bg-card shadow-md transition-all hover:shadow-lg hover:scale-[1.02]"
-                      onClick={() => console.log("[v0] Circle clicked:", circle.id)}
+                      onClick={() => router.push(`/circles/${circle.id}`)}
                     >
                       <CardContent className="p-6">
                         <div className="mb-4 flex items-start justify-between">
@@ -749,8 +754,22 @@ export default function HomePage() {
                     </Card>
                   ))}
 
-                  <Button variant="outline" className="w-full rounded-xl bg-transparent shadow-sm">
-                    <Users className="mr-2 h-4 w-4" />
+                  {circles.filter((circle) => circle.role === "admin").length === 0 && (
+                    <div className="py-8 text-center">
+                      <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground mb-3">You're not managing any circles yet</p>
+                      <Button variant="outline" size="sm" onClick={() => router.push('/circles')} className="bg-transparent">
+                        Explore Circles
+                      </Button>
+                    </div>
+                  )}
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full rounded-xl bg-transparent shadow-sm" 
+                    onClick={() => setCreateCircleModalOpen(true)}
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
                     Create New Circle
                   </Button>
                 </div>
@@ -782,7 +801,7 @@ export default function HomePage() {
                       <div className={`rounded-full p-2 ${tx.type === "received" ? "bg-success/10" : "bg-accent/10"}`}>
                         {tx.type === "received" ? (
                           <ArrowDownRight
-                            className={`h-4 w-4 ${tx.type === "received" ? "text-success" : "text-accent"}`}
+                            className={`h-4 w-4 ${tx.type === "received" ? "text-success" : "text-foreground"}`}
                           />
                         ) : (
                           <ArrowUpRight
@@ -819,10 +838,10 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* Active Circles */}
+          {/* Circles You Manage */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Active Circles</CardTitle>
+              <CardTitle>Circles You Manage</CardTitle>
               <Link href="/circles">
                 <Button variant="ghost" size="sm">
                   View All
@@ -831,7 +850,7 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {circles.map((circle) => (
+                {circles.filter((circle) => circle.role === "admin").map((circle) => (
                   <div
                     key={circle.id}
                     className="flex items-center justify-between rounded-xl border border-border p-4 shadow-sm"
@@ -855,8 +874,12 @@ export default function HomePage() {
                     </div>
                   </div>
                 ))}
-                <Button variant="outline" className="w-full rounded-xl bg-transparent shadow-sm">
-                  <Users className="mr-2 h-4 w-4" />
+                <Button 
+                  variant="outline" 
+                  className="w-full rounded-xl bg-transparent shadow-sm" 
+                  onClick={() => setCreateCircleModalOpen(true)}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
                   Create New Circle
                 </Button>
               </div>
@@ -887,6 +910,7 @@ export default function HomePage() {
       <WithdrawModal open={withdrawModalOpen} onOpenChange={setWithdrawModalOpen} currentBalance={mainWalletBalance} />
       <BudgetWalletModal open={budgetModalOpen} onOpenChange={handleBudgetModalClose} />
       <GoalWalletModal open={goalModalOpen} onOpenChange={handleGoalModalClose} />
+      <CreateCircleModal open={createCircleModalOpen} onOpenChange={handleCreateCircleModalClose} />
     </div>
   )
 }

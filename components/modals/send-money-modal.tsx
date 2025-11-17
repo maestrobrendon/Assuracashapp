@@ -11,6 +11,10 @@ import { Search, Check, AlertCircle } from 'lucide-react'
 import { BiometricAuthModal } from "@/components/modals/biometric-auth-modal"
 import { useBiometric } from "@/lib/hooks/use-biometric"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { createTransaction } from "@/lib/actions/transactions"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface SendMoneyModalProps {
   open: boolean
@@ -32,6 +36,8 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
   const [biometricModalOpen, setBiometricModalOpen] = useState(false)
   const [requiresBiometric, setRequiresBiometric] = useState(false)
   const { isBiometricEnabled, isLoading: isBiometricLoading } = useBiometric()
+  const { accountMode } = useAccountMode()
+  const { toast } = useToast()
 
   const recentUsers = [
     { name: "Jane Doe", username: "@janedoe", avatar: "J" },
@@ -81,8 +87,105 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
     }
   }
 
-  const processTransaction = () => {
-    setStep("success")
+  const processTransaction = async () => {
+    const sendAmount = Number.parseFloat(amount)
+    if (!sendAmount || sendAmount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (sendAmount > currentBalance) {
+      toast({
+        title: "Insufficient balance",
+        description: "You don't have enough funds for this transaction",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!accountMode) {
+      toast({
+        title: "Error",
+        description: "Account mode not loaded",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      console.log('[v0] Starting send money transaction:', { amount: sendAmount, mode: accountMode })
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        toast({
+          title: "Not authenticated",
+          description: "Please log in to send money",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const { data: walletData, error: walletError } = await supabase
+        .from('main_wallets')
+        .select('balance')
+        .eq('user_id', session.user.id)
+        .eq('mode', accountMode)
+        .maybeSingle()
+
+      if (walletError) throw walletError
+
+      const newBalance = (walletData?.balance || 0) - sendAmount
+      console.log('[v0] Updating balance:', { oldBalance: walletData?.balance, newBalance })
+
+      const { error: updateError } = await supabase
+        .from('main_wallets')
+        .update({ balance: newBalance })
+        .eq('user_id', session.user.id)
+        .eq('mode', accountMode)
+
+      if (updateError) throw updateError
+
+      let transactionDescription = ''
+      if (sendMethod === 'bank') {
+        transactionDescription = `Sent to ${bankName} - ${accountNumber}`
+      } else if (sendMethod === 'user') {
+        transactionDescription = `Sent to ${selectedUser}`
+      } else {
+        transactionDescription = `Sent to circle`
+      }
+
+      if (note) {
+        transactionDescription += ` - ${note}`
+      }
+
+      await createTransaction({
+        userId: session.user.id,
+        amount: sendAmount,
+        type: 'withdrawal',
+        description: transactionDescription,
+        status: 'completed',
+        mode: accountMode,
+      })
+
+      console.log('[v0] Send money transaction successful')
+      setStep("success")
+      
+      toast({
+        title: "Success!",
+        description: `₦${sendAmount.toLocaleString()} sent successfully`,
+      })
+    } catch (error) {
+      console.error('[v0] Error sending money:', error)
+      toast({
+        title: "Error",
+        description: "Failed to send money. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleBiometricCancel = () => {

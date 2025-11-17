@@ -25,6 +25,9 @@
   --color-input: oklch(from hsl(var(--input-hsl)) l c h);
   --color-ring: oklch(from hsl(var(--ring-hsl)) l c h);
   --radius-md: 0.75rem;
+  /* Adding font family definitions to main theme block */
+  --font-sans: 'Manrope', 'Manrope Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
 }
 
 :root {

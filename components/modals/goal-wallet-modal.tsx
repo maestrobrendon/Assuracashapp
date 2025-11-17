@@ -34,24 +34,44 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
   const [step, setStep] = useState<"form" | "success">("form")
   const [isCreating, setIsCreating] = useState(false)
 
-  const accountMode = useAccountMode()
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
 
   const handleCreate = async () => {
+    if (accountModeLoading || !accountMode) {
+      alert("Please wait while we load your account settings...")
+      return
+    }
+
     setIsCreating(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!user) {
+      if (!session?.user) {
         alert("Please log in to create a goal wallet")
         setIsCreating(false)
         return
       }
 
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", session.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        console.error("[v0] Profile not found:", profileError)
+        alert("Your profile is not set up yet. Please complete your profile first.")
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Creating goal wallet for user:", session.user.id, "mode:", accountMode)
+
       const { data: wallet, error } = await supabase
         .from("goal_wallets")
         .insert({
-          user_id: user.id,
+          user_id: session.user.id,
           name: goalName,
           target_amount: Number.parseFloat(targetAmount),
           balance: 0,
@@ -65,7 +85,7 @@ export function GoalWalletModal({ open, onOpenChange }: GoalWalletModalProps) {
             ? new Date(Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000).toISOString() 
             : null,
           lock_duration_days: lockDuration ? Number.parseInt(lockDuration) : null,
-          mode: accountMode, // Add mode field
+          mode: accountMode,
         })
         .select()
         .single()

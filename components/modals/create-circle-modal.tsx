@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Globe, Lock } from 'lucide-react'
 import { format } from "date-fns"
 import { supabase } from "@/lib/supabase"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface CreateCircleModalProps {
   open: boolean
@@ -30,25 +31,42 @@ export function CreateCircleModal({ open, onOpenChange, onSuccess }: CreateCircl
   const [allowExternal, setAllowExternal] = useState(false)
   const [showMemberNames, setShowMemberNames] = useState(true)
   const [showContributions, setShowContributions] = useState(true)
-  const [recurringEnabled, setRecurringEnabled] = useState(false)
-  const [recurringAmount, setRecurringAmount] = useState("")
-  const [recurringFrequency, setRecurringFrequency] = useState("monthly")
   const [isCreating, setIsCreating] = useState(false)
 
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
+
   const handleCreate = async () => {
+    if (accountModeLoading || !accountMode) {
+      alert("Please wait while we load your account settings...")
+      return
+    }
+
     setIsCreating(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!user) {
+      if (!session?.user) {
         console.error("[v0] Not authenticated")
         alert("Please log in to create a circle")
         setIsCreating(false)
         return
       }
 
-      console.log("[v0] Creating circle for user:", user.id)
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", session.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        console.error("[v0] Profile not found:", profileError)
+        alert("Your profile is not set up yet. Please complete your profile first.")
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Creating circle for user:", session.user.id, "mode:", accountMode)
 
       const { data: circle, error: circleError } = await supabase
         .from("circles")
@@ -57,15 +75,13 @@ export function CreateCircleModal({ open, onOpenChange, onSuccess }: CreateCircl
           description: description,
           category: category,
           target_amount: targetAmount ? Number.parseFloat(targetAmount) : null,
-          target_date: deadline ? deadline.toISOString() : null,
           visibility: isPublic ? "public" : "private",
           allow_external_contributions: allowExternal,
-          created_by: user.id,
+          created_by: session.user.id,
           purpose: description || circleName,
           current_balance: 0,
           member_count: 1,
-          recurring_amount: recurringEnabled && recurringAmount ? Number.parseFloat(recurringAmount) : null,
-          recurring_frequency: recurringEnabled ? recurringFrequency : null,
+          mode: accountMode,
         })
         .select()
         .single()
@@ -83,9 +99,10 @@ export function CreateCircleModal({ open, onOpenChange, onSuccess }: CreateCircl
         .from("circle_members")
         .insert({
           circle_id: circle.id,
-          user_id: user.id,
+          user_id: session.user.id,
           role: "admin",
           total_contributed: 0,
+          mode: accountMode,
         })
 
       if (memberError) {
@@ -237,50 +254,6 @@ export function CreateCircleModal({ open, onOpenChange, onSuccess }: CreateCircl
               </div>
               <Switch checked={showContributions} onCheckedChange={setShowContributions} />
             </div>
-          </div>
-
-          {/* Recurring Contributions */}
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Suggested Recurring Contribution</p>
-                <p className="text-xs text-muted-foreground">Optional recommended amount for members</p>
-              </div>
-              <Switch checked={recurringEnabled} onCheckedChange={setRecurringEnabled} />
-            </div>
-
-            {recurringEnabled && (
-              <div className="grid gap-4 pl-6">
-                <div className="space-y-2">
-                  <Label htmlFor="recurring-amount">Amount</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
-                    <Input
-                      id="recurring-amount"
-                      type="number"
-                      placeholder="0.00"
-                      className="pl-8"
-                      value={recurringAmount}
-                      onChange={(e) => setRecurringAmount(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="recurring-frequency">Frequency</Label>
-                  <Select value={recurringFrequency} onValueChange={setRecurringFrequency}>
-                    <SelectTrigger id="recurring-frequency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Actions */}

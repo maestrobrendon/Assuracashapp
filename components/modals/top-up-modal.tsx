@@ -9,6 +9,7 @@ import { Copy, CreditCard, Building2, QrCode, Check, Landmark } from 'lucide-rea
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { createTransaction } from "@/lib/actions/transactions"
+import { useAccountMode } from "@/lib/hooks/use-account-mode"
 
 interface TopUpModalProps {
   open: boolean
@@ -28,6 +29,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
   const [currentBalance, setCurrentBalance] = useState(0)
   const [selectedBank, setSelectedBank] = useState<string | null>(null)
   const { toast } = useToast()
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
 
   const dedicatedAccount = "1234567890"
   const dedicatedBank = "Wema Bank"
@@ -40,13 +42,16 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 
   const fetchCurrentBalance = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (accountModeLoading || !accountMode) return
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
 
       const { data, error } = await supabase
         .from('main_wallets')
         .select('balance')
-        .eq('user_id', user.id)
+        .eq('user_id', session.user.id)
+        .eq('mode', accountMode)
         .single()
 
       if (!error && data) {
@@ -76,9 +81,20 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
       return
     }
 
+    if (!accountMode) {
+      toast({
+        title: "Error",
+        description: "Account mode not loaded",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      console.log('[v0] Starting top-up transaction:', { amount: topUpAmount, mode: accountMode })
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
         toast({
           title: "Not authenticated",
           description: "Please log in to top up",
@@ -90,34 +106,43 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
       const { data: walletData, error: walletError } = await supabase
         .from('main_wallets')
         .select('balance')
-        .eq('user_id', user.id)
-        .single()
+        .eq('user_id', session.user.id)
+        .eq('mode', accountMode)
+        .maybeSingle()
 
       if (walletError) throw walletError
 
-      const newBalance = (walletData.balance || 0) + topUpAmount
+      const newBalance = (walletData?.balance || 0) + topUpAmount
+      console.log('[v0] Updating balance:', { oldBalance: walletData?.balance, newBalance })
 
       const { error: updateError } = await supabase
         .from('main_wallets')
         .update({ balance: newBalance })
-        .eq('user_id', user.id)
+        .eq('user_id', session.user.id)
+        .eq('mode', accountMode)
 
       if (updateError) throw updateError
 
       await createTransaction({
-        userId: user.id,
+        userId: session.user.id,
         amount: topUpAmount,
         type: 'deposit',
         description: `Added funds via ${method === 'card' ? 'card' : method === 'bank' ? 'linked bank' : method === 'qr' ? 'QR code' : 'bank transfer'}`,
         status: 'completed',
+        mode: accountMode,
       })
 
+      console.log('[v0] Top-up successful')
       setStep("success")
       
       toast({
         title: "Success!",
         description: `₦${topUpAmount.toLocaleString()} added to your wallet`,
       })
+      
+      setTimeout(() => {
+        fetchCurrentBalance()
+      }, 500)
     } catch (error) {
       console.error('[v0] Error topping up:', error)
       toast({

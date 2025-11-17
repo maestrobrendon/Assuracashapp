@@ -45,27 +45,45 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
   const [step, setStep] = useState<"form" | "success">("form")
   const [isCreating, setIsCreating] = useState(false)
 
-  const { accountMode } = useAccountMode()
+  const { accountMode, isLoading: accountModeLoading } = useAccountMode()
 
   const handleCreate = async () => {
+    if (accountModeLoading || !accountMode) {
+      alert("Please wait while we load your account settings...")
+      return
+    }
+
     setIsCreating(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!user) {
+      if (!session?.user) {
         alert("Please log in to create a wallet")
         setIsCreating(false)
         return
       }
 
-      console.log("[v0] Creating wallet for user:", user.id)
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", session.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        console.error("[v0] Profile not found:", profileError)
+        alert("Your profile is not set up yet. Please complete your profile first.")
+        setIsCreating(false)
+        return
+      }
+
+      console.log("[v0] Creating wallet for user:", session.user.id, "mode:", accountMode)
 
       if (walletType === "budget") {
         const { data: wallet, error } = await supabase
           .from("budget_wallets")
           .insert({
-            user_id: user.id,
+            user_id: session.user.id,
             name: walletName,
             balance: Number.parseFloat(budgetAmount),
             spend_limit: spendLimit ? Number.parseFloat(spendLimit) : null,
@@ -99,7 +117,7 @@ export function BudgetWalletModal({ open, onOpenChange }: BudgetWalletModalProps
         const { data: wallet, error } = await supabase
           .from("goal_wallets")
           .insert({
-            user_id: user.id,
+            user_id: session.user.id,
             name: walletName,
             target_amount: Number.parseFloat(budgetAmount),
             balance: 0,
