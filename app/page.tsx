@@ -251,15 +251,24 @@ export default function HomePage() {
 
   const checkAuth = async () => {
     const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    data: { session },
+  } = await supabase.auth.getSession()
 
-    if (!session) {
-      router.push("/auth/login")
-    } else {
-      setIsLoading(false)
+  if (!session) {
+    router.push("/auth/login")
+  } else {
+    // Check if email is verified
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user && !user.email_confirmed_at) {
+      // Email not verified, redirect to verify page
+      router.push("/auth/verify-email")
+      return
     }
+    
+    setIsLoading(false)
   }
+}
 
   useEffect(() => {
     checkAuth()

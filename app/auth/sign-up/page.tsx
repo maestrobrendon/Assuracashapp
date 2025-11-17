@@ -45,7 +45,7 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          emailRedirectTo: undefined,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
           },
@@ -53,7 +53,7 @@ export default function SignUpPage() {
       })
       if (error) throw error
       
-      window.location.href = '/dashboard'
+      router.push('/auth/verify-email')
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
       setIsLoading(false)

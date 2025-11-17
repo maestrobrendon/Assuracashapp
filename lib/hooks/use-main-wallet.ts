@@ -9,31 +9,36 @@ export function useMainWallet() {
   const { accountMode, isLoading: isModeLoading } = useAccountMode()
 
   const fetchBalance = async () => {
-    if (isModeLoading) return
+    if (isModeLoading || !accountMode) {
+      return
+    }
     
     try {
       setIsLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!user) {
-        throw new Error('Not authenticated')
+      if (!session?.user) {
+        setIsLoading(false)
+        setBalance(0)
+        return
       }
+
+      const userId = session.user.id
 
       const { data, error: fetchError } = await supabase
         .from('main_wallets')
         .select('balance')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('mode', accountMode)
         .maybeSingle()
 
       if (fetchError) throw fetchError
 
       if (!data) {
-        console.log('[v0] No main wallet found for mode:', accountMode, '- creating one')
         const { data: newWallet, error: insertError } = await supabase
           .from('main_wallets')
           .insert({
-            user_id: user.id,
+            user_id: userId,
             mode: accountMode,
             balance: 0,
             currency: 'NGN'
@@ -42,19 +47,17 @@ export function useMainWallet() {
           .single()
 
         if (insertError) {
-          // If duplicate key error, it means wallet was created by another process, fetch it
+          // If duplicate key error, wallet exists - fetch it
           if (insertError.code === '23505') {
-            console.log('[v0] Main wallet already exists, fetching it')
             const { data: existingWallet } = await supabase
               .from('main_wallets')
               .select('balance')
-              .eq('user_id', user.id)
+              .eq('user_id', userId)
               .eq('mode', accountMode)
               .single()
             
             setBalance(existingWallet?.balance || 0)
           } else {
-            console.error('[v0] Error creating main wallet:', insertError)
             throw insertError
           }
         } else {
@@ -75,7 +78,9 @@ export function useMainWallet() {
   }
 
   useEffect(() => {
-    fetchBalance()
+    if (!isModeLoading && accountMode) {
+      fetchBalance()
+    }
 
     const channel = supabase
       .channel('main-wallet-changes')
