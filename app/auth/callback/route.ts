@@ -11,6 +11,6 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  // URL to redirect to after email confirmation
-  return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Redirect to root (/) which is your dashboard
+  return NextResponse.redirect(new URL('/', request.url))
 }
