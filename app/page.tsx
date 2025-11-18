@@ -169,6 +169,8 @@ export default function HomePage() {
         })))
       }
 
+      await loadCircles()
+
       calculateQuickStats()
     } catch (error) {
       console.error('[v0] Error loading wallets:', error)
@@ -176,6 +178,64 @@ export default function HomePage() {
       setIsLoadingWallets(false)
     }
   }
+
+  const loadCircles = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Fetch circles where user is a member
+      const { data: memberData, error: memberError } = await supabase
+        .from('circle_members')
+        .select('circle_id, role, total_contributed')
+        .eq('user_id', user.id)
+        .eq('mode', accountMode)
+
+      if (memberError) {
+        console.error('[v0] Error fetching circle members:', memberError)
+        return
+      }
+
+      if (!memberData || memberData.length === 0) {
+        console.log('[v0] User is not in any circles')
+        setCircles([])
+        return
+      }
+
+      // Fetch circle details
+      const circleIds = memberData.map(m => m.circle_id)
+      const { data: circleData, error: circleError } = await supabase
+        .from('circles')
+        .select('id, name, current_balance, member_count, description')
+        .in('id', circleIds)
+        .eq('mode', accountMode)
+
+      if (circleError) {
+        console.error('[v0] Error fetching circles:', circleError)
+        return
+      }
+
+      // Merge circle data with member role
+      const circlesWithRole = circleData?.map(circle => {
+        const memberInfo = memberData.find(m => m.circle_id === circle.id)
+        return {
+          id: circle.id,
+          name: circle.name,
+          balance: circle.current_balance || 0,
+          members: circle.member_count || 0,
+          role: memberInfo?.role || 'member',
+          description: circle.description,
+        }
+      }) || []
+
+      console.log('[v0] Circles loaded:', circlesWithRole.length)
+      setCircles(circlesWithRole)
+    } catch (error) {
+      console.error('[v0] Error loading circles:', error)
+      setCircles([])
+    }
+  }
+
 
   const loadTransactions = async () => {
     if (isModeLoading) return
@@ -227,7 +287,7 @@ export default function HomePage() {
 
       const budgetTotal = budgetResult.data?.reduce((sum, w) => sum + (w.balance || 0), 0) || 0
       const goalTotal = goalResult.data?.reduce((sum, w) => sum + (w.balance || 0), 0) || 0
-      const circlesTotal = circles.reduce((sum, c) => sum + c.balance, 0)
+      const circlesTotal = circles.reduce((sum, c) => sum + (c.balance || 0), 0)
       const transactionCount = txResult.data?.length || 0
 
       setQuickStats({
@@ -317,10 +377,30 @@ export default function HomePage() {
       })
       .subscribe()
 
+    const circlesChannel = supabase
+      .channel('circles-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circles' }, () => {
+        console.log('[v0] Circle changed, reloading...')
+        loadCircles()
+        calculateQuickStats()
+      })
+      .subscribe()
+
+    const circleMembersChannel = supabase
+      .channel('circle-members-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, () => {
+        console.log('[v0] Circle membership changed, reloading...')
+        loadCircles()
+        calculateQuickStats()
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(budgetChannel)
       supabase.removeChannel(goalChannel)
       supabase.removeChannel(txChannel)
+      supabase.removeChannel(circlesChannel)
+      supabase.removeChannel(circleMembersChannel)
     }
   }, [isLoading, isModeLoading])
 
@@ -732,7 +812,7 @@ export default function HomePage() {
               {/* Circles */}
               {activeWalletTab === "circles" && (
                 <div className="space-y-4">
-                  {circles.filter((circle) => circle.role === "admin").map((circle) => (
+                  {circles.slice(0, 5).map((circle) => (
                     <Card
                       key={circle.id}
                       className="group cursor-pointer overflow-hidden border-border/50 bg-card shadow-md transition-all hover:shadow-lg hover:scale-[1.02]"
@@ -755,10 +835,10 @@ export default function HomePage() {
                     </Card>
                   ))}
 
-                  {circles.filter((circle) => circle.role === "admin").length === 0 && (
+                  {circles.length === 0 && (
                     <div className="py-8 text-center">
                       <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-                      <p className="text-sm text-muted-foreground mb-3">You're not managing any circles yet</p>
+                      <p className="text-sm text-muted-foreground mb-3">You're not in any circles yet</p>
                       <Button variant="outline" size="sm" onClick={() => router.push('/circles')} className="bg-transparent">
                         Explore Circles
                       </Button>
@@ -875,6 +955,17 @@ export default function HomePage() {
                     </div>
                   </div>
                 ))}
+
+                {circles.filter((circle) => circle.role === "admin").length === 0 && (
+                  <div className="py-8 text-center">
+                    <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground mb-3">You're not managing any circles yet</p>
+                    <Button variant="outline" size="sm" onClick={() => router.push('/circles')} className="bg-transparent">
+                      Explore Circles
+                    </Button>
+                  </div>
+                )}
+
                 <Button 
                   variant="outline" 
                   className="w-full rounded-xl bg-transparent shadow-sm" 
