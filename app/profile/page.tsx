@@ -25,6 +25,7 @@ import { useMainWallet } from "@/lib/hooks/use-main-wallet"
 import { useAccountMode } from "@/lib/hooks/use-account-mode"
 import { useToast } from "@/hooks/use-toast"
 import { CreateVFDWalletModal } from "@/components/modals/create-vfd-wallet-modal"
+import { useTheme } from 'next-themes'
 
 type UserSettings = {
   biometric_enabled: boolean
@@ -54,6 +55,7 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const { balance, refetch: refetchBalance } = useMainWallet()
   const { accountMode, isLoading: isModeLoading } = useAccountMode()
+  const { setTheme } = useTheme()
   
   const [profile, setProfile] = useState<{
     full_name: string
@@ -204,12 +206,8 @@ export default function ProfilePage() {
       setSettings(prev => ({ ...prev, [key]: value }))
       
       if (key === 'dark_mode_enabled') {
-        console.log("[v0] Toggling dark mode:", value)
-        if (value) {
-          document.documentElement.classList.add('dark')
-        } else {
-          document.documentElement.classList.remove('dark')
-        }
+        console.log("[v0] Dark mode setting changed to:", value)
+        setTheme(value ? 'dark' : 'light')
       }
       
       toast({

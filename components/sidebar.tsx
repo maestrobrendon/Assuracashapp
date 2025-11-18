@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Wallet, Users, BarChart3, Settings, HelpCircle, LogOut, Shield, Menu, X, ChevronDown } from 'lucide-react'
+import { Home, Wallet, Users, BarChart3, Settings, HelpCircle, LogOut, Shield, Menu, X, ChevronDown, Activity } from 'lucide-react'
 import Link from "next/link"
 import { usePathname, useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -14,6 +14,7 @@ const navigation = [
   { name: "Wallets", href: "/wallets", icon: Wallet },
   { name: "Circles", href: "/circles", icon: Users },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Activity", href: "/activity", icon: Activity },
 ]
 
 const bottomNavigation = [

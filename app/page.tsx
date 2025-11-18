@@ -202,6 +202,7 @@ export default function HomePage() {
           date: formatDate(tx.created_at),
           shielded: tx.type === 'shielded',
           description: tx.description,
+          activityType: tx.activity_type,
         }))
         
         setRecentTransactions(formattedTransactions)
@@ -784,7 +785,7 @@ export default function HomePage() {
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Transactions</CardTitle>
-              <Link href="/wallets">
+              <Link href="/activity">
                 <Button variant="ghost" size="sm">
                   View All
                 </Button>

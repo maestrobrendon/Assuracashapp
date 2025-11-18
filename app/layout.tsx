@@ -22,8 +22,8 @@ export default function RootLayout({
       <body className={`${manrope.className} antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <AuthLayoutWrapper>{children}</AuthLayoutWrapper>

@@ -41,21 +41,47 @@ export default function SignUpPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log("[v0] Starting signup process for:", email)
+      
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
           },
         },
       })
-      if (error) throw error
       
-      router.push('/auth/verify-email')
+      console.log("[v0] Signup response:", { data, error: signUpError })
+      
+      if (signUpError) {
+        console.error("[v0] Signup error:", signUpError)
+        if (signUpError.message.includes('already registered')) {
+          throw new Error('This email is already registered. Please sign in instead.')
+        } else if (signUpError.message.includes('invalid')) {
+          throw new Error('Please check your email and password.')
+        } else {
+          throw new Error(signUpError.message)
+        }
+      }
+
+      if (data.user) {
+        console.log("[v0] User created successfully, redirecting to verify email")
+        router.push('/auth/verify-email')
+      } else {
+        throw new Error('Account creation failed. Please try again.')
+      }
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+      console.error("[v0] Signup error caught:", error)
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
+      
+      if (errorMessage.includes('Database error')) {
+        setError("Account creation failed. Please try again or contact support if the issue persists.")
+      } else {
+        setError(errorMessage)
+      }
       setIsLoading(false)
     }
   }
