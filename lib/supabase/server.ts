@@ -1,6 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+/**
+ * Creates a Supabase client for server-side usage (Server Components, Route Handlers, Server Actions)
+ * Important: Don't put this client in a global variable. Always create a new client within each function.
+ */
 export async function createClient() {
   const cookieStore = await cookies()
 
@@ -18,9 +22,8 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // The "setAll" method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing user sessions.
           }
         },
       },
