@@ -128,6 +128,49 @@ export default function HomePage() {
     }
   }
 
+  // CRITICAL: Ensure demo data exists (fallback protection)
+  const ensureDemoData = async (userId: string) => {
+    try {
+      console.log('[v0] Checking if demo data exists for user:', userId)
+      
+      // Check if demo data exists
+      const { data: mainWallet, error: walletError } = await supabase
+        .from('main_wallets')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('mode', accountMode)
+        .maybeSingle()
+      
+      if (walletError) {
+        console.error('[v0] Error checking main wallet:', walletError)
+        return
+      }
+      
+      // If no main wallet, create demo data
+      if (!mainWallet) {
+        console.log('[v0] No demo data found. Creating missing demo data...')
+        
+        const { error: rpcError } = await supabase.rpc('create_demo_data_for_user', {
+          user_id_param: userId
+        })
+        
+        if (rpcError) {
+          console.error('[v0] Failed to create demo data:', rpcError.message)
+        } else {
+          console.log('[v0] ✅ Demo data created successfully! Reloading...')
+          // Reload the page to show new data
+          setTimeout(() => {
+            window.location.reload()
+          }, 1000)
+        }
+      } else {
+        console.log('[v0] Demo data already exists')
+      }
+    } catch (error) {
+      console.error('[v0] Error checking demo data:', error)
+    }
+  }
+
   const loadWallets = async () => {
     if (isModeLoading) return
     
@@ -236,7 +279,6 @@ export default function HomePage() {
     }
   }
 
-
   const loadTransactions = async () => {
     if (isModeLoading) return
     
@@ -317,24 +359,29 @@ export default function HomePage() {
 
   const checkAuth = async () => {
     const {
-    data: { session },
-  } = await supabase.auth.getSession()
+      data: { session },
+    } = await supabase.auth.getSession()
 
-  if (!session) {
-    router.push("/auth/login")
-  } else {
-    // Check if email is verified
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (user && !user.email_confirmed_at) {
-      // Email not verified, redirect to verify page
-      router.push("/auth/verify-email")
-      return
+    if (!session) {
+      router.push("/auth/login")
+    } else {
+      // Check if email is verified
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user && !user.email_confirmed_at) {
+        // Email not verified, redirect to verify page
+        router.push("/auth/verify-email")
+        return
+      }
+      
+      // CRITICAL: Ensure demo data exists (fallback protection)
+      if (user) {
+        await ensureDemoData(user.id)
+      }
+      
+      setIsLoading(false)
     }
-    
-    setIsLoading(false)
   }
-}
 
   useEffect(() => {
     checkAuth()

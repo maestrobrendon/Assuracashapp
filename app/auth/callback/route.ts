@@ -8,33 +8,58 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = createClient()
-    const { data } = await supabase.auth.exchangeCodeForSession(code)
     
-    // Check if demo data exists, if not create it
-    if (data?.user) {
-      const { data: mainWallet } = await supabase
-        .from('main_wallets')
-        .select('id')
-        .eq('user_id', data.user.id)
-        .eq('mode', 'demo')
-        .maybeSingle()
-      
-      // If no demo wallet exists, create demo data
-      if (!mainWallet) {
-        console.log('[v0] Creating demo data for new user:', data.user.id)
-        const { error } = await supabase.rpc('create_demo_data_for_user', {
-          user_id_param: data.user.id
-        })
-        
-        if (error) {
-          console.error('[v0] Error creating demo data:', error)
-        } else {
-          console.log('[v0] Demo data created successfully')
-        }
-      }
+    // Exchange code for session
+    const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (sessionError) {
+      console.error('[v0] Session exchange failed:', sessionError)
+      return NextResponse.redirect(new URL('/auth/login?error=callback_failed', request.url))
     }
+    
+    // CRITICAL: Initialize demo data for new users
+    if (data?.user) {
+      try {
+        console.log('[v0] Checking demo data for user:', data.user.id)
+        
+        // Check if user already has demo data
+        const { data: mainWallet, error: walletError } = await supabase
+          .from('main_wallets')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .eq('mode', 'demo')
+          .maybeSingle()
+        
+        if (walletError) {
+          console.error('[v0] Error checking main wallet:', walletError)
+        }
+        
+        // If no demo wallet exists, create all demo data
+        if (!mainWallet) {
+          console.log('[v0] No demo wallet found. Creating demo data...')
+          
+          const { error: rpcError } = await supabase.rpc('create_demo_data_for_user', {
+            user_id_param: data.user.id
+          })
+          
+          if (rpcError) {
+            console.error('[v0] Demo data creation failed:', rpcError.message, rpcError.details)
+          } else {
+            console.log('[v0] ✅ Demo data created successfully for user:', data.user.id)
+          }
+        } else {
+          console.log('[v0] Demo wallet already exists for user:', data.user.id)
+        }
+      } catch (err) {
+        console.error('[v0] Unexpected error in demo data creation:', err)
+      }
+    } else {
+      console.error('[v0] No user data after session exchange')
+    }
+  } else {
+    console.error('[v0] No code parameter in callback URL')
   }
 
-  // Redirect to root (/) which is your dashboard
+  // Always redirect to dashboard
   return NextResponse.redirect(new URL('/', request.url))
 }
