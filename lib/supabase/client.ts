@@ -1,8 +1,9 @@
-// Re-export the single Supabase instance for backward compatibility
-import { supabase } from "@/lib/supabase"
+import { createBrowserClient } from "@supabase/ssr"
 
-export { supabase }
+export const createClient = () =>
+  createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
-export const createClient = () => {
-  return supabase
-}
+export const supabase = createClient()

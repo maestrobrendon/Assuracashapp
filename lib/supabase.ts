@@ -1,23 +1,16 @@
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // 🔥 Fix hot reload: use one global instance only
 const globalForSupabase = globalThis as unknown as {
-  supabase?: ReturnType<typeof createClient>
+  supabase?: ReturnType<typeof createBrowserClient>
 }
 
 export const supabase =
   globalForSupabase.supabase ??
-  createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      storageKey: "assuracash-auth",
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  })
+  createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const isDevelopment =
   typeof window === "undefined" ? process.env.NODE_ENV !== "production" : process.env.NEXT_PUBLIC_ENV !== "production"
