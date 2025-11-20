@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
         // We removed the check for existing wallet so this runs every time to fill in any missing pieces
         const { error: rpcError } = await supabase.rpc("create_demo_data_for_user", {
-          new_user_id: data.user.id,
+          p_user_id: data.user.id,
         })
 
         if (rpcError) {
