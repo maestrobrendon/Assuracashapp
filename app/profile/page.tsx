@@ -1,15 +1,44 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
-import { useRouter } from 'next/navigation'
-import { Shield, Wallet, Settings, Bell, Lock, Download, Upload, ChevronRight, User, CreditCard, FileText, DollarSign, HelpCircle, LogOut, Trash2, Globe, Moon, Sun, Fingerprint, Eye, EyeOff, Mail, Phone, MessageSquare, Gift, Star, Building2, UserCheck, Award as IdCard, Receipt, FileCheck, BarChart3, Percent, Gamepad2, Banknote, ArrowRight } from 'lucide-react'
+import { useRouter } from "next/navigation"
+import {
+  Shield,
+  Wallet,
+  Settings,
+  Bell,
+  Lock,
+  ChevronRight,
+  User,
+  CreditCard,
+  HelpCircle,
+  LogOut,
+  Trash2,
+  Moon,
+  Sun,
+  Fingerprint,
+  Gift,
+  Building2,
+  UserCheck,
+  Award as IdCard,
+  Receipt,
+  FileCheck,
+  BarChart3,
+  Percent,
+  Gamepad2,
+  Banknote,
+  ArrowRight,
+  Copy,
+  Check,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +54,7 @@ import { useMainWallet } from "@/lib/hooks/use-main-wallet"
 import { useAccountMode } from "@/lib/hooks/use-account-mode"
 import { useToast } from "@/hooks/use-toast"
 import { CreateVFDWalletModal } from "@/components/modals/create-vfd-wallet-modal"
-import { useTheme } from 'next-themes'
+import { useTheme } from "next-themes"
 
 type UserSettings = {
   biometric_enabled: boolean
@@ -56,16 +85,17 @@ export default function ProfilePage() {
   const { balance, refetch: refetchBalance } = useMainWallet()
   const { accountMode, isLoading: isModeLoading } = useAccountMode()
   const { setTheme } = useTheme()
-  
+
   const [profile, setProfile] = useState<{
     full_name: string
     email: string
     phone: string
     zcash_id: string
+    cash_tag: string
     created_at: string
     initials: string
   } | null>(null)
-  
+
   const [settings, setSettings] = useState<UserSettings>({
     biometric_enabled: false,
     show_dashboard_balances: true,
@@ -86,18 +116,19 @@ export default function ProfilePage() {
     two_factor_enabled: false,
     kyc_verified: false,
     nin: null,
-    rewards_points: 0
+    rewards_points: 0,
   })
-  
+
   const [stats, setStats] = useState({
     totalBalance: 0,
     circleCount: 0,
-    transactionCount: 0
+    transactionCount: 0,
   })
-  
+
   const [isLoading, setIsLoading] = useState(true)
   const [showSwitchToLiveDialog, setShowSwitchToLiveDialog] = useState(false)
   const [showCreateVFDWalletModal, setShowCreateVFDWalletModal] = useState(false)
+  const [copiedTag, setCopiedTag] = useState(false)
 
   useEffect(() => {
     loadProfileData()
@@ -105,35 +136,34 @@ export default function ProfilePage() {
 
   async function loadProfileData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) return
 
       // Load profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single()
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("user_id", user.id).single()
 
       if (profileData) {
         const names = profileData.full_name?.split(" ") || ["User"]
-        const initials = names.map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+        const initials = names
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
         setProfile({
           full_name: profileData.full_name || "User",
           email: profileData.email || user.email || "",
           phone: profileData.phone || "",
           zcash_id: profileData.zcash_id || "",
+          cash_tag: profileData.cash_tag || "",
           created_at: profileData.created_at,
           initials,
         })
       }
 
       // Load settings
-      const { data: settingsData } = await supabase
-        .from("user_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .single()
+      const { data: settingsData } = await supabase.from("user_settings").select("*").eq("user_id", user.id).single()
 
       if (settingsData) {
         setSettings(settingsData)
@@ -142,15 +172,17 @@ export default function ProfilePage() {
       // Load stats
       const [circlesRes, transactionsRes] = await Promise.all([
         supabase.from("circle_members").select("id", { count: "exact" }).eq("user_id", user.id),
-        supabase.from("transactions").select("id", { count: "exact" }).or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        supabase
+          .from("transactions")
+          .select("id", { count: "exact" })
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
       ])
 
       setStats({
         totalBalance: balance,
         circleCount: circlesRes.count || 0,
-        transactionCount: transactionsRes.count || 0
+        transactionCount: transactionsRes.count || 0,
       })
-
     } catch (error) {
       console.error("[v0] Error loading profile:", error)
     } finally {
@@ -161,7 +193,9 @@ export default function ProfilePage() {
   async function updateSetting(key: keyof UserSettings, value: boolean) {
     try {
       console.log("[v0] Updating setting:", key, "to", value)
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) {
         console.log("[v0] No user found")
         return
@@ -171,7 +205,7 @@ export default function ProfilePage() {
 
       const { data: existingSettings, error: checkError } = await supabase
         .from("user_settings")
-        .select('*')
+        .select("*")
         .eq("user_id", user.id)
         .single()
 
@@ -190,12 +224,10 @@ export default function ProfilePage() {
         console.log("[v0] Update error:", error)
       } else {
         console.log("[v0] Creating new settings record")
-        const { error: insertError } = await supabase
-          .from("user_settings")
-          .insert({
-            user_id: user.id,
-            [key]: value,
-          })
+        const { error: insertError } = await supabase.from("user_settings").insert({
+          user_id: user.id,
+          [key]: value,
+        })
 
         error = insertError
         console.log("[v0] Insert error:", error)
@@ -203,13 +235,13 @@ export default function ProfilePage() {
 
       if (error) throw error
 
-      setSettings(prev => ({ ...prev, [key]: value }))
-      
-      if (key === 'dark_mode_enabled') {
+      setSettings((prev) => ({ ...prev, [key]: value }))
+
+      if (key === "dark_mode_enabled") {
         console.log("[v0] Dark mode setting changed to:", value)
-        setTheme(value ? 'dark' : 'light')
+        setTheme(value ? "dark" : "light")
       }
-      
+
       toast({
         title: "Setting updated",
         description: "Your preference has been saved successfully.",
@@ -224,16 +256,18 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleSwitchMode(newMode: 'demo' | 'live') {
+  async function handleSwitchMode(newMode: "demo" | "live") {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) return
 
-      if (newMode === 'live') {
+      if (newMode === "live") {
         const { data: profileData } = await supabase
-          .from('profiles')
-          .select('vfd_wallet_id, vfd_account_number')
-          .eq('user_id', user.id)
+          .from("profiles")
+          .select("vfd_wallet_id, vfd_account_number")
+          .eq("user_id", user.id)
           .single()
 
         if (!profileData?.vfd_wallet_id || !profileData?.vfd_account_number) {
@@ -243,18 +277,16 @@ export default function ProfilePage() {
         }
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ account_mode: newMode })
-        .eq('user_id', user.id)
+      const { error } = await supabase.from("profiles").update({ account_mode: newMode }).eq("user_id", user.id)
 
       if (error) throw error
 
       toast({
-        title: newMode === 'live' ? "Switched to Live Mode" : "Back in Demo Mode",
-        description: newMode === 'live' 
-          ? "Your dashboard is now empty - you're starting fresh with real money."
-          : "Your practice data is still here!",
+        title: newMode === "live" ? "Switched to Live Mode" : "Back in Demo Mode",
+        description:
+          newMode === "live"
+            ? "Your dashboard is now empty - you're starting fresh with real money."
+            : "Your practice data is still here!",
       })
 
       setTimeout(() => {
@@ -271,13 +303,25 @@ export default function ProfilePage() {
   }
 
   async function handleVFDWalletCreated() {
-    await handleSwitchMode('live')
+    await handleSwitchMode("live")
     setShowCreateVFDWalletModal(false)
   }
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push("/auth/login")
+  }
+
+  const handleCopyTag = () => {
+    if (profile?.cash_tag) {
+      navigator.clipboard.writeText(profile.cash_tag)
+      setCopiedTag(true)
+      toast({
+        title: "Copied!",
+        description: "Cash tag copied to clipboard",
+      })
+      setTimeout(() => setCopiedTag(false), 2000)
+    }
   }
 
   if (isLoading || isModeLoading) {
@@ -303,6 +347,24 @@ export default function ProfilePage() {
             <div>
               <h1 className="text-2xl font-bold text-foreground">My Account,</h1>
               <p className="text-muted-foreground">{profile?.full_name || "User"}</p>
+              {profile?.cash_tag && (
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge
+                    variant="outline"
+                    className="text-primary border-primary/20 bg-primary/5 px-2 py-0.5 text-sm font-medium"
+                  >
+                    {profile.cash_tag}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={handleCopyTag}
+                  >
+                    {copiedTag ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </Button>
+                </div>
+              )}
             </div>
             <Avatar className="h-16 w-16 border-2 border-primary/20">
               <AvatarFallback className="bg-primary text-lg font-bold text-primary-foreground">
@@ -313,11 +375,13 @@ export default function ProfilePage() {
         </div>
 
         <Card className="mb-6 overflow-hidden">
-          <CardHeader className={`${
-            accountMode === 'demo' 
-              ? 'bg-gradient-to-r from-orange-500/10 to-orange-400/10 border-b border-orange-500/20' 
-              : 'bg-gradient-to-r from-emerald-500/10 to-emerald-400/10 border-b border-emerald-500/20'
-          }`}>
+          <CardHeader
+            className={`${
+              accountMode === "demo"
+                ? "bg-gradient-to-r from-orange-500/10 to-orange-400/10 border-b border-orange-500/20"
+                : "bg-gradient-to-r from-emerald-500/10 to-emerald-400/10 border-b border-emerald-500/20"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg mb-1">Account Mode</CardTitle>
@@ -326,12 +390,12 @@ export default function ProfilePage() {
               <Badge
                 variant="secondary"
                 className={`flex items-center gap-2 px-3 py-2 text-sm ${
-                  accountMode === 'demo'
-                    ? 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30'
-                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                  accountMode === "demo"
+                    ? "bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30"
+                    : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
                 }`}
               >
-                {accountMode === 'demo' ? (
+                {accountMode === "demo" ? (
                   <>
                     <Gamepad2 className="h-4 w-4" />
                     Demo Mode - Playing with fake money
@@ -346,18 +410,17 @@ export default function ProfilePage() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            {accountMode === 'demo' ? (
+            {accountMode === "demo" ? (
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="rounded-full bg-muted p-2 flex-shrink-0">
                     <Gamepad2 className="h-5 w-5 text-orange-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground mb-1">
-                      You're currently in Demo Mode
-                    </p>
+                    <p className="font-medium text-foreground mb-1">You're currently in Demo Mode</p>
                     <p className="text-sm text-muted-foreground">
-                      Practice with fake money and explore all features without any risk. Your demo data is saved and you can return anytime.
+                      Practice with fake money and explore all features without any risk. Your demo data is saved and
+                      you can return anytime.
                     </p>
                   </div>
                 </div>
@@ -378,16 +441,14 @@ export default function ProfilePage() {
                     <Banknote className="h-5 w-5 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground mb-1">
-                      You're in Live Mode
-                    </p>
+                    <p className="font-medium text-foreground mb-1">You're in Live Mode</p>
                     <p className="text-sm text-muted-foreground">
                       All transactions use real money. Your funds are secure and protected.
                     </p>
                   </div>
                 </div>
                 <Button
-                  onClick={() => handleSwitchMode('demo')}
+                  onClick={() => handleSwitchMode("demo")}
                   variant="outline"
                   className="w-full border-orange-500/20 text-orange-600 hover:bg-orange-500/10"
                   size="lg"
@@ -406,10 +467,10 @@ export default function ProfilePage() {
               Enable Finger Print/Face ID
               <Fingerprint className="h-4 w-4 text-muted-foreground" />
             </Label>
-            <Switch 
-              id="biometric" 
+            <Switch
+              id="biometric"
               checked={settings.biometric_enabled}
-              onCheckedChange={(checked) => updateSetting('biometric_enabled', checked)}
+              onCheckedChange={(checked) => updateSetting("biometric_enabled", checked)}
             />
           </div>
 
@@ -417,10 +478,10 @@ export default function ProfilePage() {
             <Label htmlFor="show-balances" className="text-base font-normal">
               Show Dashboard Account Balances
             </Label>
-            <Switch 
-              id="show-balances" 
+            <Switch
+              id="show-balances"
               checked={settings.show_dashboard_balances}
-              onCheckedChange={(checked) => updateSetting('show_dashboard_balances', checked)}
+              onCheckedChange={(checked) => updateSetting("show_dashboard_balances", checked)}
             />
           </div>
 
@@ -429,10 +490,10 @@ export default function ProfilePage() {
               Interest Enabled on Savings (Riba)
               <Percent className="h-4 w-4 text-emerald-500" />
             </Label>
-            <Switch 
-              id="interest" 
+            <Switch
+              id="interest"
               checked={settings.interest_enabled}
-              onCheckedChange={(checked) => updateSetting('interest_enabled', checked)}
+              onCheckedChange={(checked) => updateSetting("interest_enabled", checked)}
             />
           </div>
         </div>
@@ -443,9 +504,7 @@ export default function ProfilePage() {
             <CardContent className="p-4">
               <div className="text-center">
                 <Wallet className="h-6 w-6 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold text-foreground">
-                  ₦{stats.totalBalance.toLocaleString()}
-                </p>
+                <p className="text-2xl font-bold text-foreground">₦{stats.totalBalance.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">Total Balance</p>
               </div>
             </CardContent>
@@ -474,21 +533,21 @@ export default function ProfilePage() {
 
         <div className="space-y-2">
           {/* Financial & Rates */}
-          <SettingsItem 
+          <SettingsItem
             icon={<BarChart3 className="h-5 w-5 text-muted-foreground" />}
             label="Today's Rates"
             onClick={() => {}}
           />
 
           {/* Account Settings */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Settings className="h-5 w-5 text-muted-foreground" />}
             label="My Account Settings"
             onClick={() => router.push("/profile/account-settings")}
           />
 
           {/* Verification */}
-          <SettingsItem 
+          <SettingsItem
             icon={<IdCard className="h-5 w-5 text-muted-foreground" />}
             label="Verify NIN"
             badge={settings.nin ? "Verified" : undefined}
@@ -496,13 +555,13 @@ export default function ProfilePage() {
           />
 
           {/* Documents */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Receipt className="h-5 w-5 text-muted-foreground" />}
             label="Generate Account Statement"
             onClick={() => {}}
           />
 
-          <SettingsItem 
+          <SettingsItem
             icon={<FileCheck className="h-5 w-5 text-muted-foreground" />}
             label="Generate Reference Letter"
             onClick={() => {}}
@@ -518,52 +577,54 @@ export default function ProfilePage() {
                   <Sun className="h-5 w-5 text-muted-foreground" />
                 )}
               </div>
-              <Label htmlFor="dark-mode" className="text-base font-normal">Enable Dark Mode</Label>
+              <Label htmlFor="dark-mode" className="text-base font-normal">
+                Enable Dark Mode
+              </Label>
             </div>
-            <Switch 
-              id="dark-mode" 
+            <Switch
+              id="dark-mode"
               checked={settings.dark_mode_enabled}
-              onCheckedChange={(checked) => updateSetting('dark_mode_enabled', checked)}
+              onCheckedChange={(checked) => updateSetting("dark_mode_enabled", checked)}
             />
           </div>
 
           {/* Support */}
-          <SettingsItem 
+          <SettingsItem
             icon={<HelpCircle className="h-5 w-5 text-muted-foreground" />}
             label="Self Help"
             onClick={() => {}}
           />
 
           {/* Security */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Lock className="h-5 w-5 text-muted-foreground" />}
             label="Security"
             onClick={() => router.push("/profile/security")}
           />
 
           {/* Privacy */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Shield className="h-5 w-5 text-muted-foreground" />}
             label="Privacy Settings"
             onClick={() => router.push("/profile/privacy")}
           />
 
           {/* Notifications */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Bell className="h-5 w-5 text-muted-foreground" />}
             label="Notifications"
             onClick={() => router.push("/profile/notifications")}
           />
 
           {/* Linked Banks */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Building2 className="h-5 w-5 text-muted-foreground" />}
             label="Linked Bank Accounts"
             onClick={() => {}}
           />
 
           {/* Referrals */}
-          <SettingsItem 
+          <SettingsItem
             icon={<Gift className="h-5 w-5 text-muted-foreground" />}
             label="Referral Program"
             onClick={() => {}}
@@ -571,18 +632,18 @@ export default function ProfilePage() {
         </div>
 
         <div className="mt-8 space-y-3">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10"
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10 bg-transparent"
             onClick={handleLogout}
           >
             <LogOut className="h-5 w-5" />
             Logout
           </Button>
 
-          <Button 
-            variant="outline" 
-            className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10"
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10 bg-transparent"
           >
             <Trash2 className="h-5 w-5" />
             Delete Account
@@ -600,7 +661,8 @@ export default function ProfilePage() {
               <AlertDialogTitle className="text-xl">Switch to Live Mode?</AlertDialogTitle>
             </div>
             <AlertDialogDescription>
-              You're about to switch to Live Mode where you can use real money. Your demo data will remain saved and you can switch back anytime.
+              You're about to switch to Live Mode where you can use real money. Your demo data will remain saved and you
+              can switch back anytime.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 px-6 pb-2">
@@ -628,16 +690,14 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="text-sm font-medium text-foreground">
-              Ready to continue?
-            </div>
+            <div className="text-sm font-medium text-foreground">Ready to continue?</div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowSwitchToLiveDialog(false)
-                handleSwitchMode('live')
+                handleSwitchMode("live")
               }}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
@@ -663,7 +723,7 @@ function SettingsItem({
   icon,
   label,
   badge,
-  onClick
+  onClick,
 }: {
   icon: React.ReactNode
   label: string
@@ -676,9 +736,7 @@ function SettingsItem({
       className="flex items-center justify-between w-full py-4 bg-card rounded-lg px-4 hover:bg-muted/50 transition-colors"
     >
       <div className="flex items-center gap-3">
-        <div className="rounded-full bg-muted p-2">
-          {icon}
-        </div>
+        <div className="rounded-full bg-muted p-2">{icon}</div>
         <span className="text-base font-normal">{label}</span>
       </div>
       <div className="flex items-center gap-2">

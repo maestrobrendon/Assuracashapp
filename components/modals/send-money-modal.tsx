@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Check, AlertCircle } from 'lucide-react'
+import { Search, Check, AlertCircle } from "lucide-react"
 import { BiometricAuthModal } from "@/components/modals/biometric-auth-modal"
 import { useBiometric } from "@/lib/hooks/use-biometric"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { createTransaction } from "@/lib/actions/transactions"
 import { useAccountMode } from "@/lib/hooks/use-account-mode"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 interface SendMoneyModalProps {
   open: boolean
@@ -31,19 +32,17 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
   const [accountNumber, setAccountNumber] = useState("")
   const [amount, setAmount] = useState("")
   const [note, setNote] = useState("")
-  const [selectedUser, setSelectedUser] = useState("")
-  
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; tag: string } | null>(null)
+
   const [biometricModalOpen, setBiometricModalOpen] = useState(false)
   const [requiresBiometric, setRequiresBiometric] = useState(false)
   const { isBiometricEnabled, isLoading: isBiometricLoading } = useBiometric()
   const { accountMode } = useAccountMode()
   const { toast } = useToast()
 
-  const recentUsers = [
-    { name: "Jane Doe", username: "@janedoe", avatar: "J" },
-    { name: "John Smith", username: "@johnsmith", avatar: "J" },
-    { name: "Emily White", username: "@emilywhite", avatar: "E" },
-  ]
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   const nigerianBanks = [
     "Access Bank",
@@ -58,25 +57,28 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
     "Wema Bank",
   ]
 
-  const checkBiometricRequirement = () => {
-    const amountValue = Number.parseFloat(amount)
-    // Require biometric for transactions over ₦10,000 if biometric is enabled
-    if (isBiometricEnabled && amountValue >= 10000) {
-      setRequiresBiometric(true)
-      return true
-    }
-    setRequiresBiometric(false)
-    return false
-  }
-
-  useEffect(() => {
-    if (amount) {
-      checkBiometricRequirement()
-    }
-  }, [amount, isBiometricEnabled])
-
   const handleReview = () => {
     setStep("review")
+  }
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return
+
+    setIsSearching(true)
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, user_id, full_name, email, cash_tag, avatar_url")
+        .or(`email.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%,cash_tag.ilike.%${searchQuery}%`)
+        .limit(5)
+
+      if (error) throw error
+      setSearchResults(data || [])
+    } catch (error) {
+      console.error("[v0] Error searching users:", error)
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const handleConfirm = () => {
@@ -117,9 +119,11 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
     }
 
     try {
-      console.log('[v0] Starting send money transaction:', { amount: sendAmount, mode: accountMode })
-      
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log("[v0] Starting send money transaction:", { amount: sendAmount, mode: accountMode })
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       if (!session?.user) {
         toast({
           title: "Not authenticated",
@@ -130,30 +134,30 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
       }
 
       const { data: walletData, error: walletError } = await supabase
-        .from('main_wallets')
-        .select('balance')
-        .eq('user_id', session.user.id)
-        .eq('mode', accountMode)
+        .from("main_wallets")
+        .select("balance")
+        .eq("user_id", session.user.id)
+        .eq("mode", accountMode)
         .maybeSingle()
 
       if (walletError) throw walletError
 
       const newBalance = (walletData?.balance || 0) - sendAmount
-      console.log('[v0] Updating balance:', { oldBalance: walletData?.balance, newBalance })
+      console.log("[v0] Updating balance:", { oldBalance: walletData?.balance, newBalance })
 
       const { error: updateError } = await supabase
-        .from('main_wallets')
+        .from("main_wallets")
         .update({ balance: newBalance })
-        .eq('user_id', session.user.id)
-        .eq('mode', accountMode)
+        .eq("user_id", session.user.id)
+        .eq("mode", accountMode)
 
       if (updateError) throw updateError
 
-      let transactionDescription = ''
-      if (sendMethod === 'bank') {
+      let transactionDescription = ""
+      if (sendMethod === "bank") {
         transactionDescription = `Sent to ${bankName} - ${accountNumber}`
-      } else if (sendMethod === 'user') {
-        transactionDescription = `Sent to ${selectedUser}`
+      } else if (sendMethod === "user") {
+        transactionDescription = `Sent to ${selectedUser?.name} (${selectedUser?.tag})`
       } else {
         transactionDescription = `Sent to circle`
       }
@@ -165,21 +169,21 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
       await createTransaction({
         userId: session.user.id,
         amount: sendAmount,
-        type: 'withdrawal',
+        type: "withdrawal",
         description: transactionDescription,
-        status: 'completed',
+        status: "completed",
         mode: accountMode,
       })
 
-      console.log('[v0] Send money transaction successful')
+      console.log("[v0] Send money transaction successful")
       setStep("success")
-      
+
       toast({
         title: "Success!",
         description: `₦${sendAmount.toLocaleString()} sent successfully`,
       })
     } catch (error) {
-      console.error('[v0] Error sending money:', error)
+      console.error("[v0] Error sending money:", error)
       toast({
         title: "Error",
         description: "Failed to send money. Please try again.",
@@ -200,7 +204,9 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
     setAccountNumber("")
     setAmount("")
     setNote("")
-    setSelectedUser("")
+    setSelectedUser(null)
+    setSearchQuery("")
+    setSearchResults([])
     setRequiresBiometric(false)
   }
 
@@ -290,40 +296,77 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
                 <TabsContent value="user" className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label>Search User</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input placeholder="Search by name or @username" className="pl-10" />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by name or @username"
+                          className="pl-10"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                        />
+                      </div>
+                      <Button onClick={handleSearch} disabled={isSearching || !searchQuery.trim()} size="sm">
+                        {isSearching ? "..." : "Find"}
+                      </Button>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Recents</Label>
+                  {searchResults.length > 0 && !selectedUser && (
                     <div className="space-y-2">
-                      {recentUsers.map((user) => (
-                        <div
-                          key={user.username}
-                          className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
-                              {user.avatar}
-                            </div>
-                            <div>
-                              <p className="font-medium">{user.name}</p>
-                              <p className="text-sm text-muted-foreground">{user.username}</p>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant={selectedUser === user.username ? "default" : "outline"}
-                            onClick={() => setSelectedUser(user.username)}
+                      <Label>Results</Label>
+                      <div className="space-y-2">
+                        {searchResults.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-accent/50 cursor-pointer"
+                            onClick={() => {
+                              setSelectedUser({
+                                id: user.user_id,
+                                name: user.full_name || "Unknown",
+                                tag: user.cash_tag || user.email,
+                              })
+                              setSearchResults([])
+                              setSearchQuery("")
+                            }}
                           >
-                            {selectedUser === user.username ? "Selected" : "Select"}
-                          </Button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback>{user.full_name?.charAt(0) || "U"}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{user.full_name}</p>
+                                <p className="text-sm text-muted-foreground">{user.cash_tag || user.email}</p>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm">
+                              Select
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {selectedUser && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 border border-primary/20">
+                          <AvatarFallback className="bg-primary text-primary-foreground">
+                            {selectedUser.name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{selectedUser.name}</p>
+                          <p className="text-sm text-muted-foreground">{selectedUser.tag}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
+                        Change
+                      </Button>
+                    </div>
+                  )}
 
                   {selectedUser && (
                     <>
@@ -402,7 +445,9 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
                   </div>
                   <div className="flex justify-between border-t border-border pt-3">
                     <span className="text-sm font-semibold">Total</span>
-                    <span className="text-lg font-bold text-primary">₦{Number.parseFloat(amount).toLocaleString()}</span>
+                    <span className="text-lg font-bold text-primary">
+                      ₦{Number.parseFloat(amount).toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
@@ -421,7 +466,7 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
                     <p className="font-medium">{note}</p>
                   </div>
                 )}
-                
+
                 {requiresBiometric && (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
@@ -468,7 +513,7 @@ export function SendMoneyModal({ open, onOpenChange, currentBalance }: SendMoney
         onSuccess={processTransaction}
         onCancel={handleBiometricCancel}
         title="Authenticate Transaction"
-        description={`Please authenticate to send ₦${amount ? Number.parseFloat(amount).toLocaleString() : '0'}`}
+        description={`Please authenticate to send ₦${amount ? Number.parseFloat(amount).toLocaleString() : "0"}`}
       />
     </>
   )
